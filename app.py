@@ -4,6 +4,7 @@ import threading
 import time
 import json
 from datetime import datetime
+import subprocess
 import pygame
 from config import Config
 
@@ -206,6 +207,39 @@ def sequence_status():
         'countdown': countdown,
         'timeline': timeline
     })
+
+@app.route('/bluetooth_scan', methods=['POST'])
+def bluetooth_scan():
+    """Trigger a bounded Bluetooth scan using bluetoothctl."""
+
+    def _scan():
+        proc = None
+        try:
+            proc = subprocess.Popen(
+                ['bluetoothctl'],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                text=True
+            )
+            proc.stdin.write('scan on\n')
+            proc.stdin.flush()
+            time.sleep(5)
+            proc.stdin.write('scan off\n')
+            proc.stdin.flush()
+        except Exception as e:
+            print(f"Bluetooth scan error: {e}")
+        finally:
+            if proc:
+                try:
+                    proc.terminate()
+                    proc.wait(timeout=5)
+                except Exception:
+                    proc.kill()
+
+    thread = threading.Thread(target=_scan, daemon=True)
+    thread.start()
+    return jsonify({'success': True, 'message': 'Bluetooth scan started'})
 
 @app.route('/audio/<filename>')
 def serve_audio(filename):
