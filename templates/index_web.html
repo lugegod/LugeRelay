@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Timing Sequence Controller</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .main-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+        .status-display {
+            background: linear-gradient(45deg, #f8f9fa, #e9ecef);
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px 0;
+            border: 2px solid #dee2e6;
+            transition: all 0.3s ease;
+        }
+        .status-display.running {
+            border-color: #28a745;
+            background: linear-gradient(45deg, #d4edda, #c3e6cb);
+        }
+        .status-display.gate-open {
+            border-color: #ffc107;
+            background: linear-gradient(45deg, #fff3cd, #ffeaa7);
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+            100% { transform: scale(1); }
+        }
+        .countdown {
+            font-size: 3rem;
+            font-weight: bold;
+            color: #495057;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .phase-indicator {
+            font-size: 1.5rem;
+            font-weight: bold;
+            text-align: center;
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 10px;
+            background: #f8f9fa;
+        }
+        .progress-container {
+            margin: 20px 0;
+        }
+        .btn-control {
+            font-size: 1.2rem;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        .slider-container {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 15px;
+            margin: 20px 0;
+        }
+        .slider-label {
+            font-weight: bold;
+            color: #495057;
+            margin-bottom: 10px;
+        }
+        .form-range {
+            height: 8px;
+        }
+        .form-range::-webkit-slider-thumb {
+            background: #667eea;
+        }
+        .form-range::-moz-range-thumb {
+            background: #667eea;
+        }
+        .audio-controls {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+        }
+        .volume-slider {
+            width: 100%;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-5">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="main-container p-4">
+                    <h1 class="text-center mb-4">
+                        <i class="bi bi-clock"></i>
+                        Timing Sequence Controller
+                    </h1>
+                    
+                    <!-- Status Display -->
+                    <div class="status-display" id="statusDisplay">
+                        <div class="phase-indicator" id="phaseIndicator">Ready</div>
+                        <div class="countdown" id="countdown">--</div>
+                        <div class="progress-container">
+                            <div class="progress" style="height: 20px;">
+                                <div class="progress-bar" id="progressBar" role="progressbar" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Audio Controls -->
+                    <div class="audio-controls">
+                        <h5>Audio Settings</h5>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <label class="slider-label">Volume</label>
+                                <input type="range" class="form-range volume-slider" id="volumeSlider" min="0" max="1" step="0.1" value="0.8">
+                            </div>
+                            <div class="col-md-4">
+                                <button class="btn btn-outline-secondary btn-sm" onclick="testAudio('beep1')">Test Beep 1</button>
+                            </div>
+                            <div class="col-md-4">
+                                <button class="btn btn-outline-secondary btn-sm" onclick="testAudio('beep2')">Test Beep 2</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Timing Controls -->
+                    <div class="slider-container">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label class="slider-label">Delay 1: <span id="delay1Value">{{ default_delay1 }}</span>s</label>
+                                <input type="range" class="form-range" id="delay1Slider" 
+                                       min="2" max="10" step="0.5" value="{{ default_delay1 }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="slider-label">Delay 2: <span id="delay2Value">{{ default_delay2 }}</span>s</label>
+                                <input type="range" class="form-range" id="delay2Slider" 
+                                       min="3" max="12" step="0.5" value="{{ default_delay2 }}">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Control Buttons -->
+                    <div class="text-center">
+                        <button class="btn btn-success btn-control me-3" id="startBtn" onclick="startSequence()">
+                            <i class="bi bi-play-fill"></i> Start Sequence
+                        </button>
+                        <button class="btn btn-danger btn-control" id="stopBtn" onclick="stopSequence()" disabled>
+                            <i class="bi bi-stop-fill"></i> Stop Sequence
+                        </button>
+                    </div>
+                    
+                    <!-- Status Messages -->
+                    <div class="mt-3">
+                        <div class="alert alert-info" id="statusMessage" style="display: none;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Audio Elements -->
+    <audio id="beep1Audio" preload="auto">
+        <source src="/audio/beep1.wav" type="audio/wav">
+    </audio>
+    <audio id="beep2Audio" preload="auto">
+        <source src="/audio/double_beep.wav" type="audio/wav">
+    </audio>
+    <audio id="beep3Audio" preload="auto">
+        <source src="/audio/long_beep.wav" type="audio/wav">
+    </audio>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Global variables
+        let statusInterval;
+        let countdownInterval;
+        let currentPhase = 'idle';
+        let lastBeep1Time = 0;
+        let lastBeep2Time = 0;
+        let lastBeep3Time = 0;
+        
+        // Audio elements
+        const beep1Audio = document.getElementById('beep1Audio');
+        const beep2Audio = document.getElementById('beep2Audio');
+        const beep3Audio = document.getElementById('beep3Audio');
+        const volumeSlider = document.getElementById('volumeSlider');
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            updateVolume();
+            startStatusUpdates();
+            
+            // Slider event listeners
+            document.getElementById('delay1Slider').addEventListener('input', function() {
+                document.getElementById('delay1Value').textContent = this.value;
+            });
+            
+            document.getElementById('delay2Slider').addEventListener('input', function() {
+                document.getElementById('delay2Value').textContent = this.value;
+            });
+            
+            volumeSlider.addEventListener('input', updateVolume);
+        });
+        
+        function updateVolume() {
+            const volume = volumeSlider.value;
+            beep1Audio.volume = volume;
+            beep2Audio.volume = volume;
+            beep3Audio.volume = volume;
+        }
+        
+        function testAudio(beepType) {
+            let audio;
+            switch(beepType) {
+                case 'beep1':
+                    audio = beep1Audio;
+                    break;
+                case 'beep2':
+                    audio = beep2Audio;
+                    break;
+                case 'beep3':
+                    audio = beep3Audio;
+                    break;
+            }
+            if (audio) {
+                audio.currentTime = 0;
+                audio.play().catch(e => console.log('Audio play failed:', e));
+            }
+        }
+        
+        function startStatusUpdates() {
+            statusInterval = setInterval(updateStatus, 100);
+        }
+        
+        function updateStatus() {
+            fetch('/sequence_status')
+                .then(response => response.json())
+                .then(data => {
+                    updateUI(data);
+                })
+                .catch(error => {
+                    console.error('Status update error:', error);
+                });
+        }
+        
+        function updateUI(data) {
+            const statusDisplay = document.getElementById('statusDisplay');
+            const phaseIndicator = document.getElementById('phaseIndicator');
+            const countdown = document.getElementById('countdown');
+            const progressBar = document.getElementById('progressBar');
+            const startBtn = document.getElementById('startBtn');
+            const stopBtn = document.getElementById('stopBtn');
+            
+            if (data.running) {
+                // Update phase and countdown
+                const phase = data.phase;
+                const countdownValue = Math.max(0, data.countdown);
+                
+                // Update phase indicator
+                let phaseText = '';
+                let phaseClass = '';
+                
+                switch(phase) {
+                    case 'delay1':
+                        phaseText = 'Delay 1 - Waiting for Beep 2';
+                        phaseClass = 'text-primary';
+                        break;
+                    case 'delay2':
+                        phaseText = 'Delay 2 - Waiting for Beep 3';
+                        phaseClass = 'text-warning';
+                        break;
+                    case 'gate_open':
+                        phaseText = 'GATE OPEN';
+                        phaseClass = 'text-success fw-bold';
+                        statusDisplay.classList.add('gate-open');
+                        break;
+                    case 'complete':
+                        phaseText = 'Sequence Complete';
+                        phaseClass = 'text-secondary';
+                        break;
+                }
+                
+                phaseIndicator.textContent = phaseText;
+                phaseIndicator.className = `phase-indicator ${phaseClass}`;
+                
+                // Update countdown
+                if (countdownValue > 0) {
+                    countdown.textContent = countdownValue.toFixed(1);
+                } else {
+                    countdown.textContent = '--';
+                }
+                
+                // Update progress bar
+                const progress = (data.current_time / data.total_time) * 100;
+                progressBar.style.width = `${Math.min(100, progress)}%`;
+                
+                // Update button states
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                statusDisplay.classList.add('running');
+                
+                // Play audio based on timeline
+                const timeline = data.timeline;
+                const currentTime = data.current_time;
+                
+                // Beep 1 (immediate)
+                if (currentTime >= timeline.beep1 && currentTime < 0.5 && lastBeep1Time === 0) {
+                    playBeep(1);
+                    lastBeep1Time = currentTime;
+                }
+                
+                // Beep 2
+                if (currentTime >= timeline.beep2 && currentTime < timeline.beep2 + 0.5 && lastBeep2Time === 0) {
+                    playBeep(2);
+                    lastBeep2Time = currentTime;
+                }
+                
+                // Beep 3
+                if (currentTime >= timeline.beep3 && currentTime < timeline.beep3 + 0.5 && lastBeep3Time === 0) {
+                    playBeep(3);
+                    lastBeep3Time = currentTime;
+                }
+                
+            } else {
+                // Reset UI to idle state
+                phaseIndicator.textContent = 'Ready';
+                phaseIndicator.className = 'phase-indicator';
+                countdown.textContent = '--';
+                progressBar.style.width = '0%';
+                
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                statusDisplay.classList.remove('running', 'gate-open');
+                
+                // Reset beep timers
+                lastBeep1Time = 0;
+                lastBeep2Time = 0;
+                lastBeep3Time = 0;
+            }
+        }
+        
+        function playBeep(beepNumber) {
+            let audio;
+            switch(beepNumber) {
+                case 1:
+                    audio = beep1Audio;
+                    break;
+                case 2:
+                    audio = beep2Audio;
+                    break;
+                case 3:
+                    audio = beep3Audio;
+                    break;
+            }
+            
+            if (audio) {
+                audio.currentTime = 0;
+                audio.play().catch(e => console.log(`Beep ${beepNumber} play failed:`, e));
+            }
+        }
+        
+        function startSequence() {
+            const delay1 = parseFloat(document.getElementById('delay1Slider').value);
+            const delay2 = parseFloat(document.getElementById('delay2Slider').value);
+            
+            fetch('/start_sequence', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    delay1: delay1,
+                    delay2: delay2
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                showMessage(data.message, data.success ? 'success' : 'danger');
+            })
+            .catch(error => {
+                console.error('Start sequence error:', error);
+                showMessage('Failed to start sequence', 'danger');
+            });
+        }
+        
+        function stopSequence() {
+            fetch('/stop_sequence', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                showMessage(data.message, data.success ? 'success' : 'danger');
+            })
+            .catch(error => {
+                console.error('Stop sequence error:', error);
+                showMessage('Failed to stop sequence', 'danger');
+            });
+        }
+        
+        function showMessage(message, type) {
+            const statusMessage = document.getElementById('statusMessage');
+            statusMessage.textContent = message;
+            statusMessage.className = `alert alert-${type}`;
+            statusMessage.style.display = 'block';
+            
+            setTimeout(() => {
+                statusMessage.style.display = 'none';
+            }, 3000);
+        }
+    </script>
+</body>
+</html> 
