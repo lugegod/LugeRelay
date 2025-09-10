@@ -17,25 +17,34 @@ current_sequence = None
 sequence_start_time = None
 
 class TimingSequence:
-    def __init__(self, delay1, delay2):
+    def __init__(self, delay1, delay2, gate_delay, gate_open_duration):
         self.delay1 = delay1  # Delay between beep 1 and beep 2
         self.delay2 = delay2  # Delay between beep 2 and beep 3
-        self.total_time = delay1 + delay2 + 3  # +3 for final beep duration + gate open time
-        
+        self.gate_delay = gate_delay  # Delay after final beep before gate opens
+        self.gate_open_duration = gate_open_duration
+        self.total_time = delay1 + delay2 + gate_delay + gate_open_duration
+
     def get_sequence_timeline(self):
         """Returns timeline of events in seconds from start"""
         return {
             'beep1': 0,
             'beep2': self.delay1,
             'beep3': self.delay1 + self.delay2,
-            'gate_open': self.delay1 + self.delay2,  # Immediately after beep 3
-            'reset': self.delay1 + self.delay2 + 3  # 3 seconds after gate open
+            'gate_open': self.delay1 + self.delay2 + self.gate_delay,
+            'reset': self.total_time
         }
 
-def init_audio():
+def init_audio(device=None):
     """Initialize pygame mixer for audio playback"""
     try:
-        pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=512)
+        pygame.mixer.quit()
+    except Exception:
+        pass
+    try:
+        if device:
+            pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=512, device=device)
+        else:
+            pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=512)
         return True
     except Exception as e:
         print(f"Audio initialization failed: {e}")
@@ -97,10 +106,19 @@ def run_sequence(sequence):
         # Play beep 3 (long beep)
         print("Playing beep 3")
         play_audio_file(app.config['BEEP3_FILE'])
-        
-        # Gate open phase starts immediately (3 seconds)
+
+        # Wait for configured gate delay
+        for _ in range(int(sequence.gate_delay * 10)):
+            if sequence_stopped:
+                return
+            time.sleep(0.1)
+
+        if sequence_stopped:
+            return
+
+        # Gate open phase
         print("Gate open phase")
-        time.sleep(3)
+        time.sleep(sequence.gate_open_duration)
         
         print("Sequence completed successfully")
         
@@ -117,9 +135,11 @@ def run_sequence(sequence):
 @app.route('/')
 def index():
     """Main GUI page"""
-    return render_template('index.html', 
+    return render_template('index.html',
                          default_delay1=app.config['DEFAULT_DELAY1'],
-                         default_delay2=app.config['DEFAULT_DELAY2'])
+                         default_delay2=app.config['DEFAULT_DELAY2'],
+                         default_gate_delay=app.config['DEFAULT_GATE_DELAY'],
+                         gate_open_duration=app.config['GATE_OPEN_DURATION'])
 
 @app.route('/start_sequence', methods=['POST'])
 def start_sequence():
@@ -133,13 +153,14 @@ def start_sequence():
         data = request.get_json()
         delay1 = float(data.get('delay1', app.config['DEFAULT_DELAY1']))
         delay2 = float(data.get('delay2', app.config['DEFAULT_DELAY2']))
-        
+        gate_delay = float(data.get('gateDelay', app.config['DEFAULT_GATE_DELAY']))
+
         # Validate delays
-        total_time = delay1 + delay2 + 3  # +3 for beep duration + gate open time
-        if total_time < 8 or total_time > 20:
+        total_time = delay1 + delay2 + gate_delay + app.config['GATE_OPEN_DURATION']
+        if total_time < app.config['MIN_TOTAL_TIME'] or total_time > app.config['MAX_TOTAL_TIME']:
             return jsonify({'success': False, 'message': 'Total sequence time must be between 8-20 seconds'})
-        
-        sequence = TimingSequence(delay1, delay2)
+
+        sequence = TimingSequence(delay1, delay2, gate_delay, app.config['GATE_OPEN_DURATION'])
         
         # Start sequence in background thread
         thread = threading.Thread(target=run_sequence, args=(sequence,))
@@ -188,6 +209,9 @@ def sequence_status():
     elif current_time < timeline['beep3']:
         phase = 'delay2'
         countdown = timeline['beep3'] - current_time
+    elif current_time < timeline['gate_open']:
+        phase = 'gate_delay'
+        countdown = timeline['gate_open'] - current_time
     elif current_time < timeline['reset']:
         phase = 'gate_open'
         countdown = timeline['reset'] - current_time
@@ -207,6 +231,74 @@ def sequence_status():
         'timeline': timeline
     })
 
+
+@app.route('/audio_devices')
+def audio_devices():
+    """Return list of available audio output devices"""
+    try:
+        from pygame._sdl2 import audio as sdl2_audio
+        devices = list(sdl2_audio.get_audio_device_names(False))
+    except Exception as e:
+        print(f"Error listing audio devices: {e}")
+        devices = []
+    return jsonify({'devices': devices, 'current': app.config.get('AUDIO_DEVICE')})
+
+
+@app.route('/set_audio_device', methods=['POST'])
+def set_audio_device():
+    """Set the active audio output device"""
+    data = request.get_json()
+    device = data.get('device')
+    if not device:
+        return jsonify({'success': False, 'message': 'No device specified'})
+    if init_audio(device):
+        app.config['AUDIO_DEVICE'] = device
+        return jsonify({'success': True})
+    else:
+        return jsonify({'success': False, 'message': 'Failed to initialize audio device'})
+
+
+@app.route('/bluetooth/devices')
+def bluetooth_devices():
+    """List known Bluetooth devices"""
+    try:
+        output = subprocess.check_output(['bluetoothctl', 'devices'], text=True)
+        devices = []
+        for line in output.strip().split('\n'):
+            parts = line.split(' ', 2)
+            if len(parts) >= 3:
+                devices.append({'address': parts[1], 'name': parts[2]})
+    except Exception as e:
+        print(f"Bluetooth device listing failed: {e}")
+        devices = []
+    return jsonify({'devices': devices})
+
+
+@app.route('/bluetooth/scan', methods=['POST'])
+def bluetooth_scan():
+    """Start scanning for Bluetooth devices"""
+    try:
+        subprocess.check_call(['bluetoothctl', 'scan', 'on'])
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+
+@app.route('/bluetooth/pair', methods=['POST'])
+def bluetooth_pair():
+    """Pair and connect to a Bluetooth device"""
+    data = request.get_json()
+    address = data.get('address')
+    if not address:
+        return jsonify({'success': False, 'message': 'No address provided'})
+    try:
+        subprocess.check_call(['bluetoothctl', 'pair', address])
+        subprocess.check_call(['bluetoothctl', 'trust', address])
+        subprocess.check_call(['bluetoothctl', 'connect', address])
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
 @app.route('/audio/<filename>')
 def serve_audio(filename):
     """Serve audio files"""
@@ -223,7 +315,7 @@ def health_check():
 
 if __name__ == '__main__':
     # Initialize audio system
-    if not init_audio():
+    if not init_audio(app.config.get('AUDIO_DEVICE')):
         print("Warning: Audio system not initialized. Audio playback will not work.")
     
     # Create audio directory if it doesn't exist

@@ -10,6 +10,9 @@ class TimingSequenceController {
         this.startStatusPolling();
         this.updateNetworkUrl();
         this.checkAudioStatus();
+        this.loadAudioDevices();
+        this.loadBluetoothDevices();
+        this.updateGateDelay();
     }
     
     initializeElements() {
@@ -18,6 +21,8 @@ class TimingSequenceController {
         this.delay1Value = document.getElementById('delay1Value');
         this.delay2Slider = document.getElementById('delay2Slider');
         this.delay2Value = document.getElementById('delay2Value');
+        this.gateDelaySlider = document.getElementById('gateDelaySlider');
+        this.gateDelayValue = document.getElementById('gateDelayValue');
         this.totalTimeDisplay = document.getElementById('totalTimeDisplay');
         
         // Status elements
@@ -34,8 +39,13 @@ class TimingSequenceController {
         // Buttons
         this.startButton = document.getElementById('startButton');
         this.stopButton = document.getElementById('stopButton');
-        
-        // Status elements
+        this.refreshAudioDevices = document.getElementById('refreshAudioDevices');
+        this.scanBluetooth = document.getElementById('scanBluetooth');
+        this.pairBluetooth = document.getElementById('pairBluetooth');
+
+        // Device selectors and status
+        this.audioDeviceSelect = document.getElementById('audioDeviceSelect');
+        this.bluetoothDeviceSelect = document.getElementById('bluetoothDeviceSelect');
         this.audioStatus = document.getElementById('audioStatus');
     }
     
@@ -43,14 +53,20 @@ class TimingSequenceController {
         // Slider events
         this.delay1Slider.addEventListener('input', () => this.updateDelay1());
         this.delay2Slider.addEventListener('input', () => this.updateDelay2());
-        
+        this.gateDelaySlider.addEventListener('input', () => this.updateGateDelay());
+
         // Button events
         this.startButton.addEventListener('click', () => this.startSequence());
         this.stopButton.addEventListener('click', () => this.stopSequence());
-        
+        this.refreshAudioDevices.addEventListener('click', () => this.loadAudioDevices());
+        this.audioDeviceSelect.addEventListener('change', () => this.setAudioDevice());
+        this.scanBluetooth.addEventListener('click', () => this.scanBluetoothDevices());
+        this.pairBluetooth.addEventListener('click', () => this.pairBluetoothDevice());
+
         // Update total time on any delay change
         this.delay1Slider.addEventListener('change', () => this.updateTotalTime());
         this.delay2Slider.addEventListener('change', () => this.updateTotalTime());
+        this.gateDelaySlider.addEventListener('change', () => this.updateTotalTime());
     }
     
     updateDelay1() {
@@ -64,11 +80,18 @@ class TimingSequenceController {
         this.delay2Value.textContent = value + 's';
         this.updateTotalTime();
     }
+
+    updateGateDelay() {
+        const value = parseFloat(this.gateDelaySlider.value);
+        this.gateDelayValue.textContent = value.toFixed(1) + 's';
+        this.updateTotalTime();
+    }
     
     updateTotalTime() {
         const delay1 = parseFloat(this.delay1Slider.value);
         const delay2 = parseFloat(this.delay2Slider.value);
-        const totalTime = delay1 + delay2 + 3; // +3 for beep duration + gate open time
+        const gateDelay = parseFloat(this.gateDelaySlider.value);
+        const totalTime = delay1 + delay2 + gateDelay + GATE_OPEN_DURATION;
         
         this.totalTimeDisplay.textContent = totalTime.toFixed(1);
         
@@ -92,6 +115,7 @@ class TimingSequenceController {
         
         const delay1 = parseFloat(this.delay1Slider.value);
         const delay2 = parseFloat(this.delay2Slider.value);
+        const gateDelay = parseFloat(this.gateDelaySlider.value);
         
         try {
             this.startButton.disabled = true;
@@ -102,7 +126,7 @@ class TimingSequenceController {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ delay1, delay2 })
+                body: JSON.stringify({ delay1, delay2, gateDelay })
             });
             
             const result = await response.json();
@@ -225,7 +249,11 @@ class TimingSequenceController {
         } else if (status.phase === 'delay2') {
             const countdown = Math.max(0, status.countdown);
             this.countdownDisplay.textContent = countdown.toFixed(1);
-            this.phaseIndicator.textContent = 'Delay 2: Countdown to Gate';
+            this.phaseIndicator.textContent = 'Delay 2: Countdown to Beep 3';
+        } else if (status.phase === 'gate_delay') {
+            const countdown = Math.max(0, status.countdown);
+            this.countdownDisplay.textContent = countdown.toFixed(1);
+            this.phaseIndicator.textContent = 'Delay 3: Countdown to Gate';
         } else if (status.phase === 'gate_open') {
             const countdown = Math.max(0, status.countdown);
             this.countdownDisplay.textContent = 'GATE OPEN';
@@ -292,7 +320,78 @@ class TimingSequenceController {
             networkUrl.textContent = `http://${hostname}:${port}`;
         }
     }
-    
+
+    async loadAudioDevices() {
+        try {
+            const response = await fetch('/audio_devices');
+            const data = await response.json();
+            this.audioDeviceSelect.innerHTML = '';
+            data.devices.forEach(dev => {
+                const option = document.createElement('option');
+                option.value = dev;
+                option.textContent = dev;
+                if (data.current === dev) option.selected = true;
+                this.audioDeviceSelect.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Failed to load audio devices', error);
+        }
+    }
+
+    async setAudioDevice() {
+        const device = this.audioDeviceSelect.value;
+        try {
+            await fetch('/set_audio_device', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ device })
+            });
+            this.checkAudioStatus();
+        } catch (error) {
+            console.error('Failed to set audio device', error);
+        }
+    }
+
+    async loadBluetoothDevices() {
+        try {
+            const response = await fetch('/bluetooth/devices');
+            const data = await response.json();
+            this.bluetoothDeviceSelect.innerHTML = '';
+            data.devices.forEach(dev => {
+                const option = document.createElement('option');
+                option.value = dev.address;
+                option.textContent = `${dev.name} (${dev.address})`;
+                this.bluetoothDeviceSelect.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Failed to load bluetooth devices', error);
+        }
+    }
+
+    async scanBluetoothDevices() {
+        try {
+            await fetch('/bluetooth/scan', { method: 'POST' });
+            setTimeout(() => this.loadBluetoothDevices(), 3000);
+        } catch (error) {
+            console.error('Bluetooth scan failed', error);
+        }
+    }
+
+    async pairBluetoothDevice() {
+        const address = this.bluetoothDeviceSelect.value;
+        if (!address) return;
+        try {
+            await fetch('/bluetooth/pair', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ address })
+            });
+            this.loadAudioDevices();
+        } catch (error) {
+            console.error('Failed to pair bluetooth device', error);
+        }
+    }
+
     async checkAudioStatus() {
         try {
             const response = await fetch('/health');
