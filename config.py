@@ -30,3 +30,8 @@ class Config:
     # Web interface settings
     AUTO_REFRESH_INTERVAL = 100  # milliseconds for status updates
     COUNTDOWN_UPDATE_INTERVAL = 50  # milliseconds for countdown updates 
+    
+    # Relay control settings
+    RELAY_PIN = 17      # BCM numbering
+    RELAY_ACTIVE_HIGH = True
+    GATE_OPEN_DURATION = 3.0
