@@ -1,3 +1,14 @@
+
+import os
+import subprocess
+import threading
+import time
+from datetime import datetime
+
+import pygame
+from flask import Flask, render_template, request, jsonify, send_from_directory
+
+
 from flask import Flask, render_template, request, jsonify, send_from_directory
 import os
 import threading
@@ -6,6 +17,7 @@ import json
 from datetime import datetime
 import subprocess
 import pygame
+
 from config import Config
 
 app = Flask(__name__)
