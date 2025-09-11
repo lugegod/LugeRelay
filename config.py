@@ -35,3 +35,4 @@ class Config:
     RELAY_PIN = 17      # BCM numbering
     RELAY_ACTIVE_HIGH = True
     GATE_OPEN_DURATION = 3.0
+    BEEP_RELAY_ALIGNMENT = 0.0  # Alignment offset in seconds (negative = beep early, positive = beep late)

@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - Luge Timing Sequence</title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Custom CSS -->
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .main-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+        
+        .settings-section {
+            background: linear-gradient(45deg, #f8f9fa, #e9ecef);
+            border-radius: 15px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(45deg, #007bff, #0056b3);
+            border: none;
+            border-radius: 10px;
+            padding: 12px 30px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 123, 255, 0.4);
+        }
+        
+        .btn-success {
+            background: linear-gradient(45deg, #28a745, #20c997);
+            border: none;
+            border-radius: 10px;
+            padding: 12px 30px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
+        }
+        
+        .btn-secondary {
+            background: linear-gradient(45deg, #6c757d, #495057);
+            border: none;
+            border-radius: 10px;
+            padding: 12px 30px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-secondary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(108, 117, 125, 0.4);
+        }
+        
+        .form-range {
+            height: 8px;
+            border-radius: 5px;
+        }
+        
+        .form-range::-webkit-slider-thumb {
+            background: linear-gradient(45deg, #007bff, #0056b3);
+            border-radius: 50%;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+        }
+        
+        .setting-value {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #007bff;
+        }
+        
+        .alert {
+            border-radius: 10px;
+            border: none;
+        }
+        
+        .nav-tabs .nav-link {
+            border-radius: 10px 10px 0 0;
+            border: none;
+            background: linear-gradient(45deg, #e9ecef, #f8f9fa);
+            color: #495057;
+            font-weight: bold;
+        }
+        
+        .nav-tabs .nav-link.active {
+            background: linear-gradient(45deg, #007bff, #0056b3);
+            color: white;
+        }
+        
+        .nav-tabs .nav-link:hover {
+            background: linear-gradient(45deg, #007bff, #0056b3);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid py-4">
+        <div class="row justify-content-center">
+            <div class="col-lg-10 col-xl-8">
+                <div class="main-container p-4">
+                    <!-- Header -->
+                    <div class="d-flex align-items-center mb-4">
+                        <a href="/" class="btn btn-outline-secondary me-3">
+                            <i class="bi bi-arrow-left"></i> ← Back
+                        </a>
+                        <div class="text-center flex-grow-1">
+                            <h1 class="display-4 fw-bold text-primary mb-0">⚙️ Settings</h1>
+                            <p class="lead text-muted mb-0">Configure your Luge Relay system</p>
+                        </div>
+                        <div style="width: 100px;"></div> <!-- Spacer for centering -->
+                    </div>
+                    
+                    <!-- Navigation Tabs -->
+                    <ul class="nav nav-tabs mb-4" id="settingsTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="timing-tab" data-bs-toggle="tab" data-bs-target="#timing" type="button" role="tab">
+                                ⏱️ Timing Settings
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="server-tab" data-bs-toggle="tab" data-bs-target="#server" type="button" role="tab">
+                                🌐 Server Settings
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="audio-tab" data-bs-toggle="tab" data-bs-target="#audio" type="button" role="tab">
+                                🔊 Audio Settings
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="relay-tab" data-bs-toggle="tab" data-bs-target="#relay" type="button" role="tab">
+                                🔌 Relay Settings
+                            </button>
+                        </li>
+                    </ul>
+                    
+                    <!-- Tab Content -->
+                    <div class="tab-content" id="settingsTabContent">
+                        <!-- Timing Settings Tab -->
+                        <div class="tab-pane fade show active" id="timing" role="tabpanel">
+                            <div class="settings-section">
+                                <h3 class="mb-4">⏱️ Timing Configuration</h3>
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-4">
+                                            <label for="defaultDelay1" class="form-label fw-bold">
+                                                Default Delay 1: <span id="defaultDelay1Value" class="setting-value">5.0s</span>
+                                            </label>
+                                            <input type="range" class="form-range" id="defaultDelay1" 
+                                                   min="1" max="15" step="0.5" value="5.0">
+                                            <div class="form-text">Default time between beep 1 and beep 2</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-4">
+                                            <label for="defaultDelay2" class="form-label fw-bold">
+                                                Default Delay 2: <span id="defaultDelay2Value" class="setting-value">8.0s</span>
+                                            </label>
+                                            <input type="range" class="form-range" id="defaultDelay2" 
+                                                   min="1" max="15" step="0.5" value="8.0">
+                                            <div class="form-text">Default time between beep 2 and beep 3</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-4">
+                                            <label for="minTotalTime" class="form-label fw-bold">
+                                                Min Total Time: <span id="minTotalTimeValue" class="setting-value">8.0s</span>
+                                            </label>
+                                            <input type="range" class="form-range" id="minTotalTime" 
+                                                   min="5" max="15" step="0.5" value="8.0">
+                                            <div class="form-text">Minimum allowed total sequence time</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-4">
+                                            <label for="maxTotalTime" class="form-label fw-bold">
+                                                Max Total Time: <span id="maxTotalTimeValue" class="setting-value">20.0s</span>
+                                            </label>
+                                            <input type="range" class="form-range" id="maxTotalTime" 
+                                                   min="10" max="30" step="0.5" value="20.0">
+                                            <div class="form-text">Maximum allowed total sequence time</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-4">
+                                    <label for="gateOpenDuration" class="form-label fw-bold">
+                                        Gate Open Duration: <span id="gateOpenDurationValue" class="setting-value">3.0s</span>
+                                    </label>
+                                    <input type="range" class="form-range" id="gateOpenDuration" 
+                                           min="1" max="10" step="0.5" value="3.0">
+                                    <div class="form-text">How long the gate stays open after the final beep</div>
+                                </div>
+                                
+                                <div class="mb-4">
+                                    <label for="beepRelayAlignment" class="form-label fw-bold">
+                                        Beep-Relay Alignment: <span id="beepRelayAlignmentValue" class="setting-value">0.0s</span>
+                                    </label>
+                                    <input type="range" class="form-range" id="beepRelayAlignment" 
+                                           min="-2" max="2" step="0.1" value="0.0">
+                                    <div class="form-text">Adjust timing to align final beep with relay signal (negative = beep early, positive = beep late)</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Server Settings Tab -->
+                        <div class="tab-pane fade" id="server" role="tabpanel">
+                            <div class="settings-section">
+                                <h3 class="mb-4">🌐 Server Configuration</h3>
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-4">
+                                            <label for="serverHost" class="form-label fw-bold">Server Host</label>
+                                            <input type="text" class="form-control" id="serverHost" value="0.0.0.0">
+                                            <div class="form-text">IP address to bind to (0.0.0.0 for all interfaces)</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-4">
+                                            <label for="serverPort" class="form-label fw-bold">Server Port</label>
+                                            <input type="number" class="form-control" id="serverPort" value="5000" min="1024" max="65535">
+                                            <div class="form-text">Port number for the web server</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="debugMode">
+                                        <label class="form-check-label fw-bold" for="debugMode">
+                                            Debug Mode
+                                        </label>
+                                        <div class="form-text">Enable debug logging and auto-reload</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-4">
+                                            <label for="autoRefreshInterval" class="form-label fw-bold">
+                                                Auto Refresh Interval: <span id="autoRefreshIntervalValue" class="setting-value">100ms</span>
+                                            </label>
+                                            <input type="range" class="form-range" id="autoRefreshInterval" 
+                                                   min="50" max="1000" step="50" value="100">
+                                            <div class="form-text">How often to update the status display</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-4">
+                                            <label for="countdownUpdateInterval" class="form-label fw-bold">
+                                                Countdown Update Interval: <span id="countdownUpdateIntervalValue" class="setting-value">50ms</span>
+                                            </label>
+                                            <input type="range" class="form-range" id="countdownUpdateInterval" 
+                                                   min="25" max="200" step="25" value="50">
+                                            <div class="form-text">How often to update the countdown display</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Audio Settings Tab -->
+                        <div class="tab-pane fade" id="audio" role="tabpanel">
+                            <div class="settings-section">
+                                <h3 class="mb-4">🔊 Audio Configuration</h3>
+                                
+                                <div class="mb-4">
+                                    <label for="audioVolume" class="form-label fw-bold">
+                                        Audio Volume: <span id="audioVolumeValue" class="setting-value">80%</span>
+                                    </label>
+                                    <input type="range" class="form-range" id="audioVolume" 
+                                           min="0" max="100" step="5" value="80">
+                                    <div class="form-text">Master volume level for all audio playback</div>
+                                </div>
+                                
+                                <div class="alert alert-info">
+                                    <h5 class="alert-heading">📁 Audio Files</h5>
+                                    <p class="mb-0">Audio file names are hardcoded and cannot be changed through the interface:</p>
+                                    <ul class="mb-0 mt-2">
+                                        <li><strong>Beep 1:</strong> beep1.wav</li>
+                                        <li><strong>Beep 2:</strong> double_beep.wav</li>
+                                        <li><strong>Beep 3:</strong> long_beep.wav</li>
+                                    </ul>
+                                    <p class="mb-0 mt-2">Place these files in the <code>audio/</code> directory.</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Relay Settings Tab -->
+                        <div class="tab-pane fade" id="relay" role="tabpanel">
+                            <div class="settings-section">
+                                <h3 class="mb-4">🔌 Relay Configuration</h3>
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-4">
+                                            <label for="relayPin" class="form-label fw-bold">Relay GPIO Pin</label>
+                                            <input type="number" class="form-control" id="relayPin" value="17" min="1" max="40">
+                                            <div class="form-text">BCM pin number for relay control</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-4">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="relayActiveHigh">
+                                                <label class="form-check-label fw-bold" for="relayActiveHigh">
+                                                    Active High
+                                                </label>
+                                                <div class="form-text">Relay activates on HIGH signal</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="alert alert-warning">
+                                    <h5 class="alert-heading">⚠️ GPIO Warning</h5>
+                                    <p class="mb-0">Changes to relay settings require a restart of the application to take effect. Make sure the GPIO pin is not being used by other processes.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Action Buttons -->
+                    <div class="d-grid gap-3 d-md-flex justify-content-md-center">
+                        <button id="saveSettings" class="btn btn-success btn-lg">
+                            💾 Save Settings
+                        </button>
+                        <button id="resetSettings" class="btn btn-secondary btn-lg">
+                            🔄 Reset to Defaults
+                        </button>
+                    </div>
+                    
+                    <!-- Status Messages -->
+                    <div id="statusMessage" class="mt-3" style="display: none;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Settings JavaScript -->
+    <script>
+        // Load settings when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSettings();
+            setupEventListeners();
+        });
+        
+        function loadSettings() {
+            fetch('/get_settings')
+                .then(response => response.json())
+                .then(data => {
+                    // Timing settings
+                    document.getElementById('defaultDelay1').value = data.default_delay1;
+                    document.getElementById('defaultDelay2').value = data.default_delay2;
+                    document.getElementById('minTotalTime').value = data.min_total_time;
+                    document.getElementById('maxTotalTime').value = data.max_total_time;
+                    document.getElementById('gateOpenDuration').value = data.gate_open_duration;
+                    document.getElementById('beepRelayAlignment').value = data.beep_relay_alignment || 0.0;
+                    
+                    // Server settings
+                    document.getElementById('serverHost').value = data.host;
+                    document.getElementById('serverPort').value = data.port;
+                    document.getElementById('debugMode').checked = data.debug;
+                    document.getElementById('autoRefreshInterval').value = data.auto_refresh_interval;
+                    document.getElementById('countdownUpdateInterval').value = data.countdown_update_interval;
+                    
+                    // Audio settings
+                    document.getElementById('audioVolume').value = data.audio_volume * 100;
+                    
+                    // Relay settings
+                    document.getElementById('relayPin').value = data.relay_pin;
+                    document.getElementById('relayActiveHigh').checked = data.relay_active_high;
+                    
+                    // Update display values
+                    updateAllDisplayValues();
+                })
+                .catch(error => {
+                    showMessage('Error loading settings: ' + error.message, 'danger');
+                });
+        }
+        
+        function setupEventListeners() {
+            // Range sliders
+            const rangeInputs = document.querySelectorAll('input[type="range"]');
+            rangeInputs.forEach(input => {
+                input.addEventListener('input', function() {
+                    updateDisplayValue(this);
+                });
+            });
+            
+            // Save button
+            document.getElementById('saveSettings').addEventListener('click', saveSettings);
+            
+            // Reset button
+            document.getElementById('resetSettings').addEventListener('click', resetSettings);
+        }
+        
+        function updateDisplayValue(input) {
+            const valueSpan = document.getElementById(input.id + 'Value');
+            if (valueSpan) {
+                let value = parseFloat(input.value);
+                if (input.id === 'audioVolume') {
+                    valueSpan.textContent = value + '%';
+                } else if (input.id.includes('Interval')) {
+                    valueSpan.textContent = value + 'ms';
+                } else {
+                    valueSpan.textContent = value + 's';
+                }
+            }
+        }
+        
+        function updateAllDisplayValues() {
+            const rangeInputs = document.querySelectorAll('input[type="range"]');
+            rangeInputs.forEach(input => {
+                updateDisplayValue(input);
+            });
+        }
+        
+        function saveSettings() {
+            const settings = {
+                // Timing settings
+                default_delay1: parseFloat(document.getElementById('defaultDelay1').value),
+                default_delay2: parseFloat(document.getElementById('defaultDelay2').value),
+                min_total_time: parseFloat(document.getElementById('minTotalTime').value),
+                max_total_time: parseFloat(document.getElementById('maxTotalTime').value),
+                gate_open_duration: parseFloat(document.getElementById('gateOpenDuration').value),
+                beep_relay_alignment: parseFloat(document.getElementById('beepRelayAlignment').value),
+                
+                // Server settings
+                host: document.getElementById('serverHost').value,
+                port: parseInt(document.getElementById('serverPort').value),
+                debug: document.getElementById('debugMode').checked,
+                auto_refresh_interval: parseInt(document.getElementById('autoRefreshInterval').value),
+                countdown_update_interval: parseInt(document.getElementById('countdownUpdateInterval').value),
+                
+                // Audio settings
+                audio_volume: parseFloat(document.getElementById('audioVolume').value) / 100,
+                
+                // Relay settings
+                relay_pin: parseInt(document.getElementById('relayPin').value),
+                relay_active_high: document.getElementById('relayActiveHigh').checked
+            };
+            
+            fetch('/save_settings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(settings)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showMessage('Settings saved successfully!', 'success');
+                } else {
+                    showMessage('Error saving settings: ' + data.message, 'danger');
+                }
+            })
+            .catch(error => {
+                showMessage('Error saving settings: ' + error.message, 'danger');
+            });
+        }
+        
+        function resetSettings() {
+            if (confirm('Are you sure you want to reset all settings to their default values?')) {
+                // Reset to default values
+                document.getElementById('defaultDelay1').value = 5.0;
+                document.getElementById('defaultDelay2').value = 8.0;
+                document.getElementById('minTotalTime').value = 8.0;
+                document.getElementById('maxTotalTime').value = 20.0;
+                document.getElementById('gateOpenDuration').value = 3.0;
+                document.getElementById('beepRelayAlignment').value = 0.0;
+                
+                document.getElementById('serverHost').value = '0.0.0.0';
+                document.getElementById('serverPort').value = 5000;
+                document.getElementById('debugMode').checked = false;
+                document.getElementById('autoRefreshInterval').value = 100;
+                document.getElementById('countdownUpdateInterval').value = 50;
+                
+                document.getElementById('audioVolume').value = 80;
+                
+                document.getElementById('relayPin').value = 17;
+                document.getElementById('relayActiveHigh').checked = true;
+                
+                updateAllDisplayValues();
+                showMessage('Settings reset to defaults. Click Save to apply changes.', 'info');
+            }
+        }
+        
+        function showMessage(message, type) {
+            const statusDiv = document.getElementById('statusMessage');
+            statusDiv.className = `alert alert-${type}`;
+            statusDiv.textContent = message;
+            statusDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                statusDiv.style.display = 'none';
+            }, 5000);
+        }
+    </script>
+</body>
+</html>

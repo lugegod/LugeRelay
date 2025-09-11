@@ -153,26 +153,35 @@
             100% { opacity: 1; }
         }
         
-        .beep-indicator {
+        .status-indicator {
             display: inline-block;
-            width: 20px;
-            height: 20px;
+            width: 24px;
+            height: 24px;
             border-radius: 50%;
-            margin: 0 5px;
+            margin: 0 8px;
             background: #6c757d;
             transition: all 0.3s ease;
+            border: 2px solid rgba(255, 255, 255, 0.3);
         }
         
-        .beep-active {
+        .red-indicator.active {
+            background: #dc3545;
+            box-shadow: 0 0 15px rgba(220, 53, 69, 0.8);
+        }
+        
+        .yellow-indicator.active {
+            background: #ffc107;
+            box-shadow: 0 0 15px rgba(255, 193, 7, 0.8);
+        }
+        
+        .green-indicator.active {
             background: #28a745;
-            box-shadow: 0 0 10px rgba(40, 167, 69, 0.6);
-            animation: beep-pulse 0.5s ease;
+            box-shadow: 0 0 15px rgba(40, 167, 69, 0.8);
         }
         
-        @keyframes beep-pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.5); }
-            100% { transform: scale(1); }
+        .blue-indicator.active {
+            background: #007bff;
+            box-shadow: 0 0 15px rgba(0, 123, 255, 0.8);
         }
         
         .gate-open-text {
@@ -188,6 +197,10 @@
             50% { transform: scale(1.1); }
             100% { transform: scale(1); }
         }
+        
+        .current-time-display {
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -199,19 +212,36 @@
                     <div class="text-center mb-4">
                         <h1 class="display-4 fw-bold text-primary">Luge Relay Training</h1>
                         <p class="lead text-muted">Configure and control your relay timing</p>
+                        <div class="mt-3">
+                            <a href="/test" class="btn btn-outline-warning btn-lg me-3">
+                                🧪 Test Mode
+                            </a>
+                            <a href="/settings" class="btn btn-outline-primary btn-lg">
+                                ⚙️ Settings
+                            </a>
+                        </div>
                     </div>
+                    
                     
                     <!-- Status Display -->
                     <div id="statusDisplay" class="status-display status-idle">
                         <div id="countdownDisplay" class="countdown-display">Ready</div>
                         <div id="phaseIndicator" class="phase-indicator">System Ready</div>
+                        
                         <div class="sequence-progress mt-3">
                             <div id="progressBar" class="progress-bar" style="width: 0%"></div>
                         </div>
+                        
+                        <!-- Current Time Display -->
+                        <div class="current-time-display mt-2">
+                            <small class="text-white-50">Current Time: <span id="currentTimeDisplay">0.0s</span></small>
+                        </div>
+                        
+                        <!-- Status Indicator Lights -->
                         <div class="mt-3">
-                            <span class="beep-indicator" id="beep1Indicator" title="Beep 1"></span>
-                            <span class="beep-indicator" id="beep2Indicator" title="Beep 2"></span>
-                            <span class="beep-indicator" id="beep3Indicator" title="Beep 3"></span>
+                            <span class="status-indicator red-indicator" id="sequenceActiveIndicator" title="Sequence Active"></span>
+                            <span class="status-indicator yellow-indicator" id="secondBeepIndicator" title="After Second Beep"></span>
+                            <span class="status-indicator green-indicator" id="gateOpenIndicator" title="Gate Open"></span>
                         </div>
                     </div>
                     
@@ -249,33 +279,24 @@
                             <button id="startButton" class="btn btn-success btn-lg">
                                 🚀 Start Sequence
                             </button>
+                            <button id="randomButton" class="btn btn-info btn-lg">
+                                🎲 Start Random
+                            </button>
                             <button id="stopButton" class="btn btn-danger btn-lg" style="display: none;">
                                 ⏹️ Stop Sequence
                             </button>
                         </div>
                     </div>
                     
-                    <!-- System Info -->
-                    <div class="row text-center">
-                        <div class="col-md-6">
-                            <div class="card">
-                                <div class="card-body">
-                                    <h5 class="card-title">📡 Network Access</h5>
-                                    <p class="card-text">Access from any device on your network</p>
-                                    <code id="networkUrl">http://raspberrypi.local:5000</code>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="card">
-                                <div class="card-body">
-                                    <h5 class="card-title">🔊 Audio Status</h5>
-                                    <p class="card-text" id="audioStatus">Checking...</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
+            </div>
+        </div>
+        
+        <!-- Relay Status Indicator (Bottom Right) -->
+        <div class="position-fixed" style="bottom: 20px; right: 20px; z-index: 1000;">
+            <div class="d-flex align-items-center bg-dark rounded-pill px-3 py-2 shadow">
+                <span class="text-white me-2 small">Relay:</span>
+                <span class="status-indicator blue-indicator" id="relayIndicator" title="Relay Status" style="width: 20px; height: 20px;"></span>
             </div>
         </div>
     </div>

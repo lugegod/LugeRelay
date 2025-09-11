@@ -8,8 +8,6 @@ class TimingSequenceController {
         this.initializeElements();
         this.bindEvents();
         this.startStatusPolling();
-        this.updateNetworkUrl();
-        this.checkAudioStatus();
     }
     
     initializeElements() {
@@ -26,17 +24,19 @@ class TimingSequenceController {
         this.phaseIndicator = document.getElementById('phaseIndicator');
         this.progressBar = document.getElementById('progressBar');
         
-        // Beep indicators
-        this.beep1Indicator = document.getElementById('beep1Indicator');
-        this.beep2Indicator = document.getElementById('beep2Indicator');
-        this.beep3Indicator = document.getElementById('beep3Indicator');
+        // Status indicators
+        this.sequenceActiveIndicator = document.getElementById('sequenceActiveIndicator');
+        this.secondBeepIndicator = document.getElementById('secondBeepIndicator');
+        this.gateOpenIndicator = document.getElementById('gateOpenIndicator');
+        this.relayIndicator = document.getElementById('relayIndicator');
         
         // Buttons
         this.startButton = document.getElementById('startButton');
+        this.randomButton = document.getElementById('randomButton');
         this.stopButton = document.getElementById('stopButton');
         
         // Status elements
-        this.audioStatus = document.getElementById('audioStatus');
+        this.currentTimeDisplay = document.getElementById('currentTimeDisplay');
     }
     
     bindEvents() {
@@ -46,6 +46,7 @@ class TimingSequenceController {
         
         // Button events
         this.startButton.addEventListener('click', () => this.startSequence());
+        this.randomButton.addEventListener('click', () => this.startRandomSequence());
         this.stopButton.addEventListener('click', () => this.stopSequence());
         
         // Update total time on any delay change
@@ -83,6 +84,7 @@ class TimingSequenceController {
             this.startButton.textContent = '🚀 Start Sequence';
         }
     }
+    
     
     async startSequence() {
         if (this.isRunning) {
@@ -125,6 +127,52 @@ class TimingSequenceController {
         }
     }
     
+    async startRandomSequence() {
+        if (this.isRunning) {
+            this.showNotification('Sequence already running!', 'warning');
+            return;
+        }
+        
+        try {
+            this.startButton.disabled = true;
+            this.randomButton.disabled = true;
+            this.randomButton.textContent = '⏳ Generating...';
+            
+            const response = await fetch('/start_random_sequence', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                this.showNotification('Random sequence started!', 'success');
+                this.isRunning = true;
+                this.updateStatusDisplay('running');
+                this.showStopButton();
+                
+                // Update the sliders to show the random values
+                this.delay1Slider.value = result.delay1;
+                this.delay2Slider.value = result.delay2;
+                this.updateDelay1();
+                this.updateDelay2();
+            } else {
+                this.showNotification(result.message, 'error');
+                this.startButton.disabled = false;
+                this.randomButton.disabled = false;
+                this.randomButton.textContent = '🎲 Start Random';
+            }
+        } catch (error) {
+            console.error('Error starting random sequence:', error);
+            this.showNotification('Failed to start random sequence', 'error');
+            this.startButton.disabled = false;
+            this.randomButton.disabled = false;
+            this.randomButton.textContent = '🎲 Start Random';
+        }
+    }
+    
     async stopSequence() {
         if (!this.isRunning) {
             this.showNotification('No sequence running!', 'warning');
@@ -149,7 +197,8 @@ class TimingSequenceController {
                 this.isRunning = false;
                 this.updateStatusDisplay('idle');
                 this.hideStopButton();
-                this.resetBeepIndicators();
+                this.resetStatusIndicators();
+                this.resetCountdown();
             } else {
                 this.showNotification(result.message, 'warning');
             }
@@ -164,19 +213,24 @@ class TimingSequenceController {
     
     showStopButton() {
         this.startButton.style.display = 'none';
+        this.randomButton.style.display = 'none';
         this.stopButton.style.display = 'block';
     }
     
     hideStopButton() {
         this.startButton.style.display = 'block';
+        this.randomButton.style.display = 'block';
         this.stopButton.style.display = 'none';
         this.startButton.disabled = false;
+        this.randomButton.disabled = false;
         this.startButton.textContent = '🚀 Start Sequence';
+        this.randomButton.textContent = '🎲 Start Random';
     }
     
     startStatusPolling() {
         this.statusInterval = setInterval(() => {
             this.updateSequenceStatus();
+            this.updateRelayStatus();
         }, 100); // Poll every 100ms
     }
     
@@ -190,12 +244,13 @@ class TimingSequenceController {
                 this.updateStatusDisplay(status.phase);
                 this.updateCountdown(status);
                 this.updateProgress(status);
-                this.updateBeepIndicators(status);
+                this.updateStatusIndicators(status);
             } else {
                 if (this.isRunning) {
                     this.isRunning = false;
                     this.updateStatusDisplay('idle');
-                    this.resetBeepIndicators();
+                    this.resetStatusIndicators();
+                    this.resetCountdown();
                     this.hideStopButton();
                 }
             }
@@ -218,6 +273,9 @@ class TimingSequenceController {
     }
     
     updateCountdown(status) {
+        // Update current time display
+        this.currentTimeDisplay.textContent = status.current_time ? status.current_time.toFixed(1) + 's' : '0.0s';
+        
         if (status.phase === 'delay1') {
             const countdown = Math.max(0, status.countdown);
             this.countdownDisplay.textContent = countdown.toFixed(1);
@@ -226,10 +284,13 @@ class TimingSequenceController {
             const countdown = Math.max(0, status.countdown);
             this.countdownDisplay.textContent = countdown.toFixed(1);
             this.phaseIndicator.textContent = 'Delay 2: Countdown to Gate';
-        } else if (status.phase === 'gate_open') {
+        } else if (status.phase === 'test_silence') {
             const countdown = Math.max(0, status.countdown);
+            this.countdownDisplay.textContent = countdown.toFixed(1);
+            this.phaseIndicator.textContent = 'Test Mode: Silence until final beep';
+        } else if (status.phase === 'gate_open') {
             this.countdownDisplay.textContent = 'GATE OPEN';
-            this.phaseIndicator.textContent = `Gate Open (${countdown.toFixed(1)}s remaining)`;
+            this.phaseIndicator.textContent = 'Gate Open - Relay Active';
         } else if (status.phase === 'complete') {
             this.countdownDisplay.textContent = 'Complete!';
             this.phaseIndicator.textContent = 'Sequence Finished - Ready for Next Run';
@@ -237,6 +298,62 @@ class TimingSequenceController {
             this.countdownDisplay.textContent = 'Ready';
             this.phaseIndicator.textContent = 'System Ready';
         }
+        
+    }
+    
+    updateStatusIndicators(status) {
+        const currentTime = status.current_time || 0;
+        const timeline = status.timeline;
+        
+        // Red indicator: Active when sequence is running
+        if (status.running) {
+            this.sequenceActiveIndicator.classList.add('active');
+        } else {
+            this.sequenceActiveIndicator.classList.remove('active');
+        }
+        
+        // Yellow indicator: Active after second beep
+        if (timeline && currentTime >= timeline.beep2) {
+            this.secondBeepIndicator.classList.add('active');
+        } else {
+            this.secondBeepIndicator.classList.remove('active');
+        }
+        
+        // Green indicator: Active when gate is open
+        if (timeline && currentTime >= timeline.gate_open && currentTime < timeline.reset) {
+            this.gateOpenIndicator.classList.add('active');
+        } else {
+            this.gateOpenIndicator.classList.remove('active');
+        }
+    }
+    
+    async updateRelayStatus() {
+        try {
+            const response = await fetch('/relay_status');
+            const status = await response.json();
+            
+            if (status.active) {
+                this.relayIndicator.classList.add('active');
+            } else {
+                this.relayIndicator.classList.remove('active');
+            }
+        } catch (error) {
+            console.error('Error updating relay status:', error);
+        }
+    }
+    
+    resetStatusIndicators() {
+        this.sequenceActiveIndicator.classList.remove('active');
+        this.secondBeepIndicator.classList.remove('active');
+        this.gateOpenIndicator.classList.remove('active');
+        this.relayIndicator.classList.remove('active');
+    }
+    
+    resetCountdown() {
+        this.countdownDisplay.textContent = 'Ready';
+        this.phaseIndicator.textContent = 'System Ready';
+        this.currentTimeDisplay.textContent = '0.0s';
+        this.progressBar.style.width = '0%';
     }
     
     updateProgress(status) {
@@ -246,70 +363,7 @@ class TimingSequenceController {
         }
     }
     
-    updateBeepIndicators(status) {
-        const currentTime = status.current_time;
-        const timeline = status.timeline;
-        
-        // Reset all indicators
-        this.resetBeepIndicators();
-        
-        // Activate indicators based on current time
-        if (currentTime >= timeline.beep1 && currentTime < timeline.beep1 + 0.5) {
-            this.activateBeep(1);
-        }
-        if (currentTime >= timeline.beep2 && currentTime < timeline.beep2 + 0.5) {
-            this.activateBeep(2);
-        }
-        if (currentTime >= timeline.beep3 && currentTime < timeline.beep3 + 1.0) {
-            this.activateBeep(3);
-        }
-    }
     
-    activateBeep(beepNumber) {
-        const indicator = this[`beep${beepNumber}Indicator`];
-        indicator.classList.add('beep-active');
-        
-        // Remove active class after animation
-        setTimeout(() => {
-            indicator.classList.remove('beep-active');
-        }, 500);
-    }
-    
-    resetBeepIndicators() {
-        this.beep1Indicator.classList.remove('beep-active');
-        this.beep2Indicator.classList.remove('beep-active');
-        this.beep3Indicator.classList.remove('beep-active');
-    }
-    
-    updateNetworkUrl() {
-        const networkUrl = document.getElementById('networkUrl');
-        const hostname = window.location.hostname;
-        const port = window.location.port;
-        
-        if (hostname === 'localhost' || hostname === '127.0.0.1') {
-            networkUrl.textContent = `http://raspberrypi.local:${port}`;
-        } else {
-            networkUrl.textContent = `http://${hostname}:${port}`;
-        }
-    }
-    
-    async checkAudioStatus() {
-        try {
-            const response = await fetch('/health');
-            const health = await response.json();
-            
-            if (health.audio_initialized) {
-                this.audioStatus.textContent = '✅ Audio System Ready';
-                this.audioStatus.style.color = '#28a745';
-            } else {
-                this.audioStatus.textContent = '❌ Audio System Error';
-                this.audioStatus.style.color = '#dc3545';
-            }
-        } catch (error) {
-            this.audioStatus.textContent = '❓ Audio Status Unknown';
-            this.audioStatus.style.color = '#ffc107';
-        }
-    }
     
     showNotification(message, type = 'info') {
         // Create notification element
