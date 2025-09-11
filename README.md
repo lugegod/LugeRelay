@@ -29,3 +29,7 @@ python app.py
 ```
 
 Open a browser to `http://localhost:5000` to control the sequence.
+
+## Raspberry Pi Setup
+
+For Raspberry Pi deployment steps—including OS installation, dependency setup, and wiring instructions—see the [Raspberry Pi setup guide](docs/raspberry_pi_setup.md).
