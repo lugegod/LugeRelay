@@ -54,9 +54,11 @@
         .btn-warning {
             background: linear-gradient(45deg, #ffc107, #fd7e14);
             border: none;
-            border-radius: 10px;
-            padding: 12px 30px;
+            border-radius: 15px;
+            padding: 20px 40px;
             font-weight: bold;
+            font-size: 1.2rem;
+            min-height: 60px;
             transition: all 0.3s ease;
         }
         
@@ -68,9 +70,11 @@
         .btn-danger {
             background: linear-gradient(45deg, #dc3545, #c82333);
             border: none;
-            border-radius: 10px;
-            padding: 12px 30px;
+            border-radius: 15px;
+            padding: 20px 40px;
             font-weight: bold;
+            font-size: 1.2rem;
+            min-height: 60px;
             transition: all 0.3s ease;
         }
         
@@ -80,14 +84,16 @@
         }
         
         .form-range {
-            height: 8px;
-            border-radius: 5px;
+            height: 12px;
+            border-radius: 8px;
         }
         
         .form-range::-webkit-slider-thumb {
             background: linear-gradient(45deg, #ffc107, #fd7e14);
             border-radius: 50%;
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+            width: 28px;
+            height: 28px;
         }
         
         .offset-value {
@@ -158,6 +164,46 @@
             padding: 1.5rem;
             margin-bottom: 2rem;
         }
+        
+        .btn-success {
+            background: linear-gradient(45deg, #28a745, #20c997);
+            border: none;
+            border-radius: 15px;
+            padding: 20px 40px;
+            font-weight: bold;
+            font-size: 1.2rem;
+            min-height: 60px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
+        }
+        
+        /* Enhanced touch responsiveness */
+        .btn-outline-secondary {
+            padding: 15px 30px;
+            font-size: 1.1rem;
+            min-height: 50px;
+            border-width: 2px;
+            border-radius: 15px;
+        }
+        
+        .offset-value {
+            font-size: 1.4rem;
+            font-weight: bold;
+            color: #fd7e14;
+        }
+        
+        .form-label {
+            font-size: 1.1rem;
+            margin-bottom: 0.8rem;
+        }
+        
+        .form-text {
+            font-size: 1rem;
+        }
     </style>
 </head>
 <body>
@@ -171,7 +217,7 @@
                             <i class="bi bi-arrow-left"></i> ← Back
                         </a>
                         <div class="text-center flex-grow-1">
-                            <h1 class="display-4 fw-bold text-warning mb-0">🧪 Test Mode</h1>
+                            <h1 class="display-4 fw-bold text-warning mb-0">Test Mode</h1>
                             <p class="lead text-muted mb-0">Quick alignment testing</p>
                         </div>
                         <div style="width: 100px;"></div> <!-- Spacer for centering -->
@@ -179,7 +225,7 @@
                     
                     <!-- Test Info -->
                     <div class="test-info">
-                        <h5 class="text-primary mb-3">📋 How Test Mode Works</h5>
+                        <h5 class="text-primary mb-3">How Test Mode Works</h5>
                         <ul class="mb-0">
                             <li><strong>3 seconds of silence</strong> - Perfect for preparing</li>
                             <li><strong>Final beep plays</strong> - Only the last beep (beep3.wav)</li>
@@ -212,7 +258,7 @@
                     
                     <!-- Test Controls -->
                     <div class="test-section">
-                        <h3 class="mb-4 text-center">⚙️ Test Configuration</h3>
+                        <h3 class="mb-4 text-center">Test Configuration</h3>
                         
                         <div class="mb-4">
                             <label for="testOffsetSlider" class="form-label fw-bold">
@@ -229,13 +275,13 @@
                         <!-- Control Buttons -->
                         <div class="d-grid gap-3 d-md-flex justify-content-md-center">
                             <button id="testModeButton" class="btn btn-warning btn-lg">
-                                🧪 Start Test (3s)
+                                Start Test (3s)
                             </button>
                             <button id="saveOffsetButton" class="btn btn-success btn-lg">
-                                💾 Save Offset
+                                Save Offset
                             </button>
                             <button id="stopButton" class="btn btn-danger btn-lg" style="display: none;">
-                                ⏹️ Stop Test
+                                Stop Test
                             </button>
                         </div>
                     </div>
@@ -245,7 +291,7 @@
                         <div class="col-md-6">
                             <div class="card">
                                 <div class="card-body">
-                                    <h5 class="card-title">🎯 Alignment Tips</h5>
+                                    <h5 class="card-title">Alignment Tips</h5>
                                     <p class="card-text">Watch the green light - it should turn on exactly when your relay activates</p>
                                 </div>
                             </div>
@@ -253,7 +299,7 @@
                         <div class="col-md-6">
                             <div class="card">
                                 <div class="card-body">
-                                    <h5 class="card-title">🔧 Fine Tuning</h5>
+                                    <h5 class="card-title">Fine Tuning</h5>
                                     <p class="card-text">Adjust the offset in small increments (0.1s) for perfect alignment</p>
                                 </div>
                             </div>
@@ -327,7 +373,7 @@
                 
                 try {
                     this.saveOffsetButton.disabled = true;
-                    this.saveOffsetButton.textContent = '⏳ Saving...';
+                    this.saveOffsetButton.textContent = 'Saving...';
                     
                     const response = await fetch('/save_test_offset', {
                         method: 'POST',
@@ -349,7 +395,7 @@
                     this.showNotification('Failed to save offset', 'error');
                 } finally {
                     this.saveOffsetButton.disabled = false;
-                    this.saveOffsetButton.textContent = '💾 Save Offset';
+                    this.saveOffsetButton.textContent = 'Save Offset';
                 }
             }
             
@@ -378,7 +424,7 @@
                 
                 try {
                     this.testModeButton.disabled = true;
-                    this.testModeButton.textContent = '⏳ Starting Test...';
+                    this.testModeButton.textContent = 'Starting Test...';
                     
                     const response = await fetch('/start_test_sequence', {
                         method: 'POST',
@@ -398,13 +444,13 @@
                     } else {
                         this.showNotification(result.message, 'error');
                         this.testModeButton.disabled = false;
-                        this.testModeButton.textContent = '🧪 Start Test (3s)';
+                        this.testModeButton.textContent = 'Start Test (3s)';
                     }
                 } catch (error) {
                     console.error('Error starting test mode:', error);
                     this.showNotification('Failed to start test', 'error');
                     this.testModeButton.disabled = false;
-                    this.testModeButton.textContent = '🧪 Start Test (3s)';
+                    this.testModeButton.textContent = 'Start Test (3s)';
                 }
             }
             
@@ -416,7 +462,7 @@
                 
                 try {
                     this.stopButton.disabled = true;
-                    this.stopButton.textContent = '⏳ Stopping...';
+                    this.stopButton.textContent = 'Stopping...';
                     
                     const response = await fetch('/stop_sequence', {
                         method: 'POST',
@@ -442,7 +488,7 @@
                     this.showNotification('Failed to stop test', 'error');
                 } finally {
                     this.stopButton.disabled = false;
-                    this.stopButton.textContent = '⏹️ Stop Test';
+                    this.stopButton.textContent = 'Stop Test';
                 }
             }
             
@@ -455,7 +501,7 @@
                 this.testModeButton.style.display = 'block';
                 this.stopButton.style.display = 'none';
                 this.testModeButton.disabled = false;
-                this.testModeButton.textContent = '🧪 Start Test (3s)';
+                this.testModeButton.textContent = 'Start Test (3s)';
             }
             
             startStatusPolling() {

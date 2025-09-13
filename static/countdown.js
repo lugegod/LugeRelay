@@ -77,11 +77,11 @@ class TimingSequenceController {
         if (totalTime < 8 || totalTime > 20) {
             this.totalTimeDisplay.style.color = '#dc3545';
             this.startButton.disabled = true;
-            this.startButton.textContent = '⚠️ Invalid Timing';
+            this.startButton.textContent = 'Invalid Timing';
         } else {
             this.totalTimeDisplay.style.color = 'white';
             this.startButton.disabled = false;
-            this.startButton.textContent = '🚀 Start Sequence';
+            this.startButton.textContent = 'Start Sequence';
         }
     }
     
@@ -97,7 +97,7 @@ class TimingSequenceController {
         
         try {
             this.startButton.disabled = true;
-            this.startButton.textContent = '⏳ Starting...';
+            this.startButton.textContent = 'Starting...';
             
             const response = await fetch('/start_sequence', {
                 method: 'POST',
@@ -117,13 +117,13 @@ class TimingSequenceController {
             } else {
                 this.showNotification(result.message, 'error');
                 this.startButton.disabled = false;
-                this.startButton.textContent = '🚀 Start Sequence';
+                this.startButton.textContent = 'Start Sequence';
             }
         } catch (error) {
             console.error('Error starting sequence:', error);
             this.showNotification('Failed to start sequence', 'error');
             this.startButton.disabled = false;
-            this.startButton.textContent = '🚀 Start Sequence';
+            this.startButton.textContent = 'Start Sequence';
         }
     }
     
@@ -136,7 +136,7 @@ class TimingSequenceController {
         try {
             this.startButton.disabled = true;
             this.randomButton.disabled = true;
-            this.randomButton.textContent = '⏳ Generating...';
+            this.randomButton.textContent = 'Generating...';
             
             const response = await fetch('/start_random_sequence', {
                 method: 'POST',
@@ -162,14 +162,14 @@ class TimingSequenceController {
                 this.showNotification(result.message, 'error');
                 this.startButton.disabled = false;
                 this.randomButton.disabled = false;
-                this.randomButton.textContent = '🎲 Start Random';
+                this.randomButton.textContent = 'Start Random';
             }
         } catch (error) {
             console.error('Error starting random sequence:', error);
             this.showNotification('Failed to start random sequence', 'error');
             this.startButton.disabled = false;
             this.randomButton.disabled = false;
-            this.randomButton.textContent = '🎲 Start Random';
+            this.randomButton.textContent = 'Start Random';
         }
     }
     
@@ -181,7 +181,7 @@ class TimingSequenceController {
         
         try {
             this.stopButton.disabled = true;
-            this.stopButton.textContent = '⏳ Stopping...';
+            this.stopButton.textContent = 'Stopping...';
             
             const response = await fetch('/stop_sequence', {
                 method: 'POST',
@@ -207,7 +207,7 @@ class TimingSequenceController {
             this.showNotification('Failed to stop sequence', 'error');
         } finally {
             this.stopButton.disabled = false;
-            this.stopButton.textContent = '⏹️ Stop Sequence';
+            this.stopButton.textContent = 'Stop Sequence';
         }
     }
     
@@ -223,8 +223,8 @@ class TimingSequenceController {
         this.stopButton.style.display = 'none';
         this.startButton.disabled = false;
         this.randomButton.disabled = false;
-        this.startButton.textContent = '🚀 Start Sequence';
-        this.randomButton.textContent = '🎲 Start Random';
+        this.startButton.textContent = 'Start Sequence';
+        this.randomButton.textContent = 'Start Random';
     }
     
     startStatusPolling() {
