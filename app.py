@@ -86,7 +86,7 @@ class TimingSequence:
     def __init__(self, delay1, delay2):
         self.delay1 = delay1  # Delay between beep 1 and beep 2
         self.delay2 = delay2  # Delay between beep 2 and beep 3
-        self.total_time = delay1 + delay2 + 3  # +3 for final beep duration + gate open time
+        self.total_time = delay1 + delay2 + 1  # +1 for final beep duration + gate open time
         
     def get_sequence_timeline(self, alignment_offset=0):
         """Returns timeline of events in seconds from start"""
@@ -100,7 +100,7 @@ class TimingSequence:
             'beep3': beep3_time,
             'gate_open': gate_open_time,  # Immediately after beep 3
             'relay_activation': relay_activation_time,  # Relay activation with alignment offset
-            'reset': gate_open_time + 3  # 3 seconds after gate open
+            'reset': gate_open_time + 1  # 1 second after gate open
         }
 
 class TestSequence:
@@ -120,31 +120,74 @@ class TestSequence:
             'beep3': beep_time,
             'gate_open': gate_open_time,  # Immediately after beep
             'relay_activation': relay_activation_time,  # Relay activation with offset
-            'reset': gate_open_time + 3  # 3 seconds after gate open
+            'reset': gate_open_time + 1  # 1 second after gate open
         }
 
 def init_audio():
-    """Initialize pygame mixer for audio playback"""
-    try:
-        pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=512)
-        return True
-    except Exception as e:
-        print(f"Audio initialization failed: {e}")
-        return False
+    """Initialize pygame mixer for audio playback with retry logic"""
+    max_retries = 3
+    retry_delay = 0.5
+    
+    for attempt in range(max_retries):
+        try:
+            # First, try to quit any existing mixer to ensure clean state
+            if pygame.mixer.get_init() is not None:
+                pygame.mixer.quit()
+                time.sleep(0.1)  # Brief pause after quit
+            
+            # Initialize with more conservative settings
+            pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=1024)
+            
+            # Verify initialization was successful
+            if pygame.mixer.get_init() is not None:
+                print(f"Audio system initialized successfully (attempt {attempt + 1})")
+                return True
+            else:
+                print(f"Audio initialization returned None (attempt {attempt + 1})")
+                
+        except Exception as e:
+            print(f"Audio initialization failed (attempt {attempt + 1}): {e}")
+            
+        # Wait before retry (except on last attempt)
+        if attempt < max_retries - 1:
+            print(f"Retrying audio initialization in {retry_delay}s...")
+            time.sleep(retry_delay)
+            retry_delay *= 1.5  # Exponential backoff
+    
+    print("Audio initialization failed after all retries")
+    return False
 
 def play_audio_file(filename):
-    """Play an audio file using pygame"""
+    """Play an audio file using pygame with fallback initialization"""
     try:
+        # Check if audio system is still initialized
+        if pygame.mixer.get_init() is None:
+            print("Audio system not initialized, attempting to reinitialize...")
+            if not init_audio():
+                print("Failed to reinitialize audio system")
+                return False
+        
         audio_path = os.path.join(app.config['AUDIO_DIR'], filename)
         if os.path.exists(audio_path):
             sound = pygame.mixer.Sound(audio_path)
             sound.play()
+            print(f"Playing audio: {filename}")
             return True
         else:
             print(f"Audio file not found: {audio_path}")
             return False
     except Exception as e:
         print(f"Error playing audio {filename}: {e}")
+        # Try to reinitialize audio system on error
+        print("Attempting to reinitialize audio system...")
+        if init_audio():
+            try:
+                sound = pygame.mixer.Sound(audio_path)
+                sound.play()
+                print(f"Successfully played audio after reinitialization: {filename}")
+                return True
+            except Exception as retry_e:
+                print(f"Failed to play audio even after reinitialization: {retry_e}")
         return False
 
 def init_relay():
@@ -283,8 +326,8 @@ def run_sequence(sequence):
                     time.sleep(0.1)
             set_relay_state(True)
         
-        # Wait for gate open duration (3 seconds)
-        for _ in range(30):  # Check every 0.1 seconds for 3 seconds
+        # Wait for gate open duration (1 second)
+        for _ in range(10):  # Check every 0.1 seconds for 1 second
             if sequence_stopped:
                 return
             time.sleep(0.1)
@@ -374,8 +417,8 @@ def run_test_sequence(sequence):
                     time.sleep(0.1)
             set_relay_state(True)
         
-        # Wait for gate open duration (3 seconds)
-        for _ in range(30):  # Check every 0.1 seconds for 3 seconds
+        # Wait for gate open duration (1 second)
+        for _ in range(10):  # Check every 0.1 seconds for 1 second
             if sequence_stopped:
                 return
             time.sleep(0.1)
@@ -419,9 +462,9 @@ def start_sequence():
         delay2 = float(data.get('delay2', app.config['DEFAULT_DELAY2']))
         
         # Validate delays
-        total_time = delay1 + delay2 + 3  # +3 for beep duration + gate open time
-        if total_time < 8 or total_time > 20:
-            return jsonify({'success': False, 'message': 'Total sequence time must be between 8-20 seconds'})
+        total_time = delay1 + delay2 + 1  # +1 for beep duration + gate open time
+        if total_time < 6 or total_time > 18:
+            return jsonify({'success': False, 'message': 'Total sequence time must be between 6-18 seconds'})
         
         sequence = TimingSequence(delay1, delay2)
         
@@ -435,18 +478,10 @@ def start_sequence():
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error: {str(e)}'})
 
-@app.route('/start_random_sequence', methods=['POST'])
-def start_random_sequence():
-    """Start a random timing sequence"""
-    global sequence_running, sequence_stopped
-    
-    if sequence_running:
-        return jsonify({'success': False, 'message': 'Sequence already running'})
-    
+@app.route('/set_random_values', methods=['POST'])
+def set_random_values():
+    """Set random timing values without starting sequence"""
     try:
-        # Reset stop flag before starting new sequence
-        sequence_stopped = False
-        
         # Generate random delays with constraint: delay2 > delay1
         import random
         
@@ -455,26 +490,19 @@ def start_random_sequence():
         
         # Generate delay2 between delay1+0.5 and 12 seconds (ensuring delay2 > delay1)
         min_delay2 = delay1 + 0.5
-        max_delay2 = min(12.0, 20.0 - delay1 - 3)  # Ensure total time doesn't exceed 20s
+        max_delay2 = min(12.0, 18.0 - delay1 - 1)  # Ensure total time doesn't exceed 18s
         delay2 = round(random.uniform(min_delay2, max_delay2), 1)
         
         # Validate total time
-        total_time = delay1 + delay2 + 3
-        if total_time < 8 or total_time > 20:
+        total_time = delay1 + delay2 + 1
+        if total_time < 6 or total_time > 18:
             # Fallback to safe values if random generation fails
             delay1 = 3.0
             delay2 = 5.0
         
-        sequence = TimingSequence(delay1, delay2)
-        
-        # Start sequence in background thread
-        thread = threading.Thread(target=run_sequence, args=(sequence,))
-        thread.daemon = True
-        thread.start()
-        
         return jsonify({
             'success': True, 
-            'message': 'Random sequence started',
+            'message': 'Random values set',
             'delay1': delay1,
             'delay2': delay2
         })
@@ -750,8 +778,20 @@ def health_check():
     return jsonify({
         'status': 'healthy',
         'timestamp': datetime.now().isoformat(),
-        'audio_initialized': pygame.mixer.get_init() is not None
+        'audio_initialized': pygame.mixer.get_init() is not None,
+        'audio_details': pygame.mixer.get_init() if pygame.mixer.get_init() else None
     })
+
+@app.route('/reinit_audio', methods=['POST'])
+def reinit_audio():
+    """Manually reinitialize audio system"""
+    try:
+        if init_audio():
+            return jsonify({'success': True, 'message': 'Audio system reinitialized successfully'})
+        else:
+            return jsonify({'success': False, 'message': 'Failed to reinitialize audio system'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Error reinitializing audio: {str(e)}'})
 
 if __name__ == '__main__':
     # Initialize audio system

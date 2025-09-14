@@ -10,34 +10,47 @@
     
     <!-- Custom CSS -->
     <style>
+        * {
+            box-sizing: border-box;
+        }
+        
         body {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
+            max-height: 100vh;
+            overflow: hidden;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
         }
         
         .main-container {
             background: rgba(255, 255, 255, 0.95);
-            border-radius: 20px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
             backdrop-filter: blur(10px);
+            height: calc(100vh - 2rem);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
         }
         
         .settings-section {
             background: linear-gradient(45deg, #f8f9fa, #e9ecef);
-            border-radius: 15px;
-            padding: 2rem;
-            margin-bottom: 2rem;
+            border-radius: 12px;
+            padding: 1.2rem;
+            margin-bottom: 1rem;
+            flex-shrink: 0;
         }
         
         .btn-primary {
             background: linear-gradient(45deg, #007bff, #0056b3);
             border: none;
-            border-radius: 15px;
-            padding: 18px 35px;
+            border-radius: 12px;
+            padding: clamp(10px, 2vw, 14px) clamp(18px, 3.5vw, 28px);
             font-weight: bold;
-            font-size: 1.1rem;
-            min-height: 55px;
+            font-size: clamp(0.9rem, 2.2vw, 1rem);
+            min-height: clamp(45px, 7vh, 55px);
             transition: all 0.3s ease;
         }
         
@@ -49,11 +62,11 @@
         .btn-success {
             background: linear-gradient(45deg, #28a745, #20c997);
             border: none;
-            border-radius: 15px;
-            padding: 18px 35px;
+            border-radius: 12px;
+            padding: clamp(10px, 2vw, 14px) clamp(18px, 3.5vw, 28px);
             font-weight: bold;
-            font-size: 1.1rem;
-            min-height: 55px;
+            font-size: clamp(0.9rem, 2.2vw, 1rem);
+            min-height: clamp(45px, 7vh, 55px);
             transition: all 0.3s ease;
         }
         
@@ -65,11 +78,11 @@
         .btn-secondary {
             background: linear-gradient(45deg, #6c757d, #495057);
             border: none;
-            border-radius: 15px;
-            padding: 18px 35px;
+            border-radius: 12px;
+            padding: clamp(10px, 2vw, 14px) clamp(18px, 3.5vw, 28px);
             font-weight: bold;
-            font-size: 1.1rem;
-            min-height: 55px;
+            font-size: clamp(0.9rem, 2.2vw, 1rem);
+            min-height: clamp(45px, 7vh, 55px);
             transition: all 0.3s ease;
         }
         
@@ -79,20 +92,37 @@
         }
         
         .form-range {
-            height: 12px;
-            border-radius: 8px;
+            height: clamp(8px, 1.5vh, 12px);
+            border-radius: 6px;
+            padding: 16px 0; /* Add padding for larger touch target */
+            margin: 12px 0; /* Add margin for easier touch interaction */
         }
         
         .form-range::-webkit-slider-thumb {
             background: linear-gradient(45deg, #007bff, #0056b3);
             border-radius: 50%;
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-            width: 28px;
-            height: 28px;
+            width: clamp(32px, 6vw, 44px);
+            height: clamp(32px, 6vw, 44px);
+            cursor: pointer;
+            -webkit-appearance: none;
+            appearance: none;
+            transition: all 0.2s ease;
+            margin-top: -12px; /* Center the thumb on the track */
+        }
+        
+        .form-range::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(0, 123, 255, 0.4);
+        }
+        
+        .form-range::-webkit-slider-thumb:active {
+            transform: scale(1.05);
+            box-shadow: 0 2px 8px rgba(0, 123, 255, 0.6);
         }
         
         .setting-value {
-            font-size: 1.1rem;
+            font-size: clamp(1rem, 2.5vw, 1.1rem);
             font-weight: bold;
             color: #007bff;
         }
@@ -119,27 +149,65 @@
             background: linear-gradient(45deg, #007bff, #0056b3);
             color: white;
         }
+        
+        .form-label {
+            font-size: clamp(1rem, 2.2vw, 1.1rem);
+            margin-bottom: clamp(0.5rem, 1vh, 0.8rem);
+        }
+        
+        .form-text {
+            font-size: clamp(0.85rem, 2vw, 1rem);
+        }
+        
+        /* Responsive container adjustments */
+        .container-fluid {
+            padding: clamp(0.5rem, 1vw, 1rem);
+        }
+        
+        .main-container {
+            max-width: min(95vw, 1000px);
+            margin: 0 auto;
+        }
+        
+        .row {
+            margin: 0;
+            height: 100%;
+        }
+        
+        .col-lg-10, .col-xl-8 {
+            padding: 0;
+            height: 100%;
+        }
+        
+        .d-grid.gap-3 {
+            gap: clamp(1rem, 2vh, 1.5rem) !important;
+        }
+        
+        .tab-content {
+            flex-grow: 1;
+            overflow-y: auto;
+        }
     </style>
 </head>
 <body>
-    <div class="container-fluid py-4">
-        <div class="row justify-content-center">
-            <div class="col-lg-10 col-xl-8">
-                <div class="main-container p-4">
+    <div class="container-fluid">
+        <div class="row justify-content-center h-100">
+            <div class="col-lg-10 col-xl-8 h-100">
+                <div class="main-container p-3 h-100 d-flex flex-column">
                     <!-- Header -->
-                    <div class="d-flex align-items-center mb-4">
-                        <a href="/" class="btn btn-outline-secondary me-3">
-                            <i class="bi bi-arrow-left"></i> ← Back
+                    <div class="d-flex align-items-center mb-2 flex-shrink-0">
+                        <a href="/" class="btn btn-outline-secondary me-2">
+                            ← Back
                         </a>
                         <div class="text-center flex-grow-1">
-                            <h1 class="display-4 fw-bold text-primary mb-0">Settings</h1>
-                            <p class="lead text-muted mb-0">Configure your Luge Relay system</p>
+                            <h1 class="fw-bold text-primary mb-0" style="font-size: clamp(1.5rem, 4vw, 2.5rem);">Settings</h1>
+                            <p class="text-muted mb-0" style="font-size: clamp(0.9rem, 2vw, 1.1rem);">Configure your Luge Relay system</p>
                         </div>
-                        <div style="width: 100px;"></div> <!-- Spacer for centering -->
+                        <div style="width: 80px;"></div> <!-- Spacer for centering -->
                     </div>
                     
                     <!-- Navigation Tabs -->
-                    <ul class="nav nav-tabs mb-4" id="settingsTabs" role="tablist">
+                    <ul class="nav nav-tabs mb-2 flex-shrink-0" id="settingsTabs" role="tablist">
                         <li class="nav-item" role="presentation">
                             <button class="nav-link active" id="timing-tab" data-bs-toggle="tab" data-bs-target="#timing" type="button" role="tab">
                                 Timing Settings
@@ -196,20 +264,20 @@
                                     <div class="col-md-6">
                                         <div class="mb-4">
                                             <label for="minTotalTime" class="form-label fw-bold">
-                                                Min Total Time: <span id="minTotalTimeValue" class="setting-value">8.0s</span>
+                                                Min Total Time: <span id="minTotalTimeValue" class="setting-value">6.0s</span>
                                             </label>
                                             <input type="range" class="form-range" id="minTotalTime" 
-                                                   min="5" max="15" step="0.5" value="8.0">
+                                                   min="3" max="12" step="0.5" value="6.0">
                                             <div class="form-text">Minimum allowed total sequence time</div>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
                                         <div class="mb-4">
                                             <label for="maxTotalTime" class="form-label fw-bold">
-                                                Max Total Time: <span id="maxTotalTimeValue" class="setting-value">20.0s</span>
+                                                Max Total Time: <span id="maxTotalTimeValue" class="setting-value">18.0s</span>
                                             </label>
                                             <input type="range" class="form-range" id="maxTotalTime" 
-                                                   min="10" max="30" step="0.5" value="20.0">
+                                                   min="8" max="25" step="0.5" value="18.0">
                                             <div class="form-text">Maximum allowed total sequence time</div>
                                         </div>
                                     </div>
@@ -217,10 +285,10 @@
                                 
                                 <div class="mb-4">
                                     <label for="gateOpenDuration" class="form-label fw-bold">
-                                        Gate Open Duration: <span id="gateOpenDurationValue" class="setting-value">3.0s</span>
+                                        Gate Open Duration: <span id="gateOpenDurationValue" class="setting-value">1.0s</span>
                                     </label>
                                     <input type="range" class="form-range" id="gateOpenDuration" 
-                                           min="1" max="10" step="0.5" value="3.0">
+                                           min="0.5" max="5" step="0.1" value="1.0">
                                     <div class="form-text">How long the gate stays open after the final beep</div>
                                 </div>
                                 
@@ -354,17 +422,17 @@
                     </div>
                     
                     <!-- Action Buttons -->
-                    <div class="d-grid gap-3 d-md-flex justify-content-md-center">
-                        <button id="saveSettings" class="btn btn-success btn-lg">
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-center flex-shrink-0">
+                        <button id="saveSettings" class="btn btn-success">
                             Save Settings
                         </button>
-                        <button id="resetSettings" class="btn btn-secondary btn-lg">
+                        <button id="resetSettings" class="btn btn-secondary">
                             Reset to Defaults
                         </button>
                     </div>
                     
                     <!-- Status Messages -->
-                    <div id="statusMessage" class="mt-3" style="display: none;"></div>
+                    <div id="statusMessage" class="mt-2" style="display: none;"></div>
                 </div>
             </div>
         </div>
@@ -502,9 +570,9 @@
                 // Reset to default values
                 document.getElementById('defaultDelay1').value = 5.0;
                 document.getElementById('defaultDelay2').value = 8.0;
-                document.getElementById('minTotalTime').value = 8.0;
-                document.getElementById('maxTotalTime').value = 20.0;
-                document.getElementById('gateOpenDuration').value = 3.0;
+                document.getElementById('minTotalTime').value = 6.0;
+                document.getElementById('maxTotalTime').value = 18.0;
+                document.getElementById('gateOpenDuration').value = 1.0;
                 document.getElementById('beepRelayAlignment').value = 0.0;
                 
                 document.getElementById('serverHost').value = '0.0.0.0';

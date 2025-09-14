@@ -21,8 +21,8 @@ class Config:
     DEFAULT_DELAY2 = 8.0  # Delay between beep 2 and beep 3
     
     # Timing constraints
-    MIN_TOTAL_TIME = 8.0   # Minimum total sequence time
-    MAX_TOTAL_TIME = 20.0  # Maximum total sequence time
+    MIN_TOTAL_TIME = 6.0   # Minimum total sequence time
+    MAX_TOTAL_TIME = 18.0  # Maximum total sequence time
     
     # Audio playback settings
     AUDIO_VOLUME = 0.8  # Volume level (0.0 to 1.0)
@@ -34,5 +34,5 @@ class Config:
     # Relay control settings
     RELAY_PIN = 17      # BCM numbering
     RELAY_ACTIVE_HIGH = True
-    GATE_OPEN_DURATION = 3.0
+    GATE_OPEN_DURATION = 1.0
     BEEP_RELAY_ALIGNMENT = 0.0  # Alignment offset in seconds (negative = beep early, positive = beep late)

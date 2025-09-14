@@ -8,6 +8,7 @@ class TimingSequenceController {
         this.initializeElements();
         this.bindEvents();
         this.startStatusPolling();
+        this.updateTotalTime(); // Calculate initial total time on page load
     }
     
     initializeElements() {
@@ -46,7 +47,7 @@ class TimingSequenceController {
         
         // Button events
         this.startButton.addEventListener('click', () => this.startSequence());
-        this.randomButton.addEventListener('click', () => this.startRandomSequence());
+        this.randomButton.addEventListener('click', () => this.setRandomValues());
         this.stopButton.addEventListener('click', () => this.stopSequence());
         
         // Update total time on any delay change
@@ -69,12 +70,13 @@ class TimingSequenceController {
     updateTotalTime() {
         const delay1 = parseFloat(this.delay1Slider.value);
         const delay2 = parseFloat(this.delay2Slider.value);
-        const totalTime = delay1 + delay2 + 3; // +3 for beep duration + gate open time
+        const totalTime = delay1 + delay2; // Only show delay1 + delay2
         
         this.totalTimeDisplay.textContent = totalTime.toFixed(1);
         
-        // Validate total time
-        if (totalTime < 8 || totalTime > 20) {
+        // Validate total time (backend will add 1 second for beep + gate open)
+        const backendTotalTime = totalTime + 1;
+        if (backendTotalTime < 6 || backendTotalTime > 18) {
             this.totalTimeDisplay.style.color = '#dc3545';
             this.startButton.disabled = true;
             this.startButton.textContent = 'Invalid Timing';
@@ -127,18 +129,12 @@ class TimingSequenceController {
         }
     }
     
-    async startRandomSequence() {
-        if (this.isRunning) {
-            this.showNotification('Sequence already running!', 'warning');
-            return;
-        }
-        
+    async setRandomValues() {
         try {
-            this.startButton.disabled = true;
             this.randomButton.disabled = true;
             this.randomButton.textContent = 'Generating...';
             
-            const response = await fetch('/start_random_sequence', {
+            const response = await fetch('/set_random_values', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -148,10 +144,7 @@ class TimingSequenceController {
             const result = await response.json();
             
             if (result.success) {
-                this.showNotification('Random sequence started!', 'success');
-                this.isRunning = true;
-                this.updateStatusDisplay('running');
-                this.showStopButton();
+                this.showNotification('Random values set!', 'success');
                 
                 // Update the sliders to show the random values
                 this.delay1Slider.value = result.delay1;
@@ -160,16 +153,13 @@ class TimingSequenceController {
                 this.updateDelay2();
             } else {
                 this.showNotification(result.message, 'error');
-                this.startButton.disabled = false;
-                this.randomButton.disabled = false;
-                this.randomButton.textContent = 'Start Random';
             }
         } catch (error) {
-            console.error('Error starting random sequence:', error);
-            this.showNotification('Failed to start random sequence', 'error');
-            this.startButton.disabled = false;
+            console.error('Error setting random values:', error);
+            this.showNotification('Failed to set random values', 'error');
+        } finally {
             this.randomButton.disabled = false;
-            this.randomButton.textContent = 'Start Random';
+            this.randomButton.textContent = 'Set Random';
         }
     }
     

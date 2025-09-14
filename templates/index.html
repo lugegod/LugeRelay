@@ -10,54 +10,69 @@
     
     <!-- Custom CSS -->
     <style>
+        * {
+            box-sizing: border-box;
+        }
+        
         body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #aa6c6c 0%, #e70a0a 100%);
             min-height: 100vh;
+            max-height: 100vh;
+            overflow: hidden;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
         }
         
         .main-container {
             background: rgba(255, 255, 255, 0.95);
-            border-radius: 20px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
             backdrop-filter: blur(10px);
+            height: calc(100vh - 2rem);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
         }
         
         .control-panel {
             background: linear-gradient(45deg, #f8f9fa, #e9ecef);
-            border-radius: 15px;
-            padding: 2rem;
-            margin-bottom: 2rem;
+            border-radius: 12px;
+            padding: 1.2rem;
+            margin-bottom: 1rem;
+            flex-shrink: 0;
         }
         
         .status-display {
             background: linear-gradient(45deg, #28a745, #20c997);
             color: white;
-            border-radius: 15px;
-            padding: 2rem;
+            border-radius: 12px;
+            padding: 1.5rem;
             text-align: center;
-            margin-bottom: 2rem;
+            margin-bottom: 1rem;
+            flex-shrink: 0;
         }
         
         .countdown-display {
-            font-size: 5rem;
+            font-size: clamp(3rem, 8vw, 5rem);
             font-weight: bold;
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            line-height: 1;
         }
         
         .phase-indicator {
-            font-size: 1.8rem;
-            margin-top: 1rem;
+            font-size: clamp(1.2rem, 3vw, 1.6rem);
+            margin-top: 0.5rem;
         }
         
         .btn-primary {
             background: linear-gradient(45deg, #007bff, #0056b3);
             border: none;
-            border-radius: 15px;
-            padding: 20px 40px;
+            border-radius: 12px;
+            padding: clamp(12px, 2vw, 16px) clamp(20px, 4vw, 32px);
             font-weight: bold;
-            font-size: 1.2rem;
-            min-height: 60px;
+            font-size: clamp(1rem, 2.5vw, 1.1rem);
+            min-height: clamp(50px, 8vh, 60px);
             transition: all 0.3s ease;
         }
         
@@ -69,11 +84,11 @@
         .btn-success {
             background: linear-gradient(45deg, #28a745, #20c997);
             border: none;
-            border-radius: 15px;
-            padding: 20px 40px;
+            border-radius: 12px;
+            padding: clamp(12px, 2vw, 16px) clamp(20px, 4vw, 32px);
             font-weight: bold;
-            font-size: 1.2rem;
-            min-height: 60px;
+            font-size: clamp(1rem, 2.5vw, 1.1rem);
+            min-height: clamp(50px, 8vh, 60px);
             transition: all 0.3s ease;
         }
         
@@ -85,11 +100,11 @@
         .btn-danger {
             background: linear-gradient(45deg, #dc3545, #c82333);
             border: none;
-            border-radius: 15px;
-            padding: 20px 40px;
+            border-radius: 12px;
+            padding: clamp(12px, 2vw, 16px) clamp(20px, 4vw, 32px);
             font-weight: bold;
-            font-size: 1.2rem;
-            min-height: 60px;
+            font-size: clamp(1rem, 2.5vw, 1.1rem);
+            min-height: clamp(50px, 8vh, 60px);
             transition: all 0.3s ease;
         }
         
@@ -99,20 +114,37 @@
         }
         
         .form-range {
-            height: 12px;
-            border-radius: 8px;
+            height: clamp(8px, 1.5vh, 12px);
+            border-radius: 6px;
+            padding: 16px 0; /* Add padding for larger touch target */
+            margin: 12px 0; /* Add margin for easier touch interaction */
         }
         
         .form-range::-webkit-slider-thumb {
             background: linear-gradient(45deg, #007bff, #0056b3);
             border-radius: 50%;
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-            width: 28px;
-            height: 28px;
+            width: clamp(32px, 6vw, 44px);
+            height: clamp(32px, 6vw, 44px);
+            cursor: pointer;
+            -webkit-appearance: none;
+            appearance: none;
+            transition: all 0.2s ease;
+            margin-top: -12px; /* Center the thumb on the track */
+        }
+        
+        .form-range::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(0, 123, 255, 0.4);
+        }
+        
+        .form-range::-webkit-slider-thumb:active {
+            transform: scale(1.05);
+            box-shadow: 0 2px 8px rgba(0, 123, 255, 0.6);
         }
         
         .delay-value {
-            font-size: 1.4rem;
+            font-size: clamp(1.1rem, 2.5vw, 1.4rem);
             font-weight: bold;
             color: #007bff;
         }
@@ -120,19 +152,19 @@
         .total-time-display {
             background: linear-gradient(45deg, #6c757d, #495057);
             color: white;
-            border-radius: 10px;
-            padding: 1rem;
+            border-radius: 8px;
+            padding: clamp(0.8rem, 2vh, 1rem);
             text-align: center;
-            font-size: 1.3rem;
+            font-size: clamp(1.1rem, 2.5vw, 1.3rem);
             font-weight: bold;
         }
         
         .sequence-progress {
-            height: 8px;
-            border-radius: 5px;
+            height: clamp(6px, 1vh, 8px);
+            border-radius: 4px;
             background: #e9ecef;
             overflow: hidden;
-            margin: 1rem 0;
+            margin: clamp(0.5rem, 1.5vh, 1rem) 0;
         }
         
         .progress-bar {
@@ -163,10 +195,10 @@
         
         .status-indicator {
             display: inline-block;
-            width: 24px;
-            height: 24px;
+            width: clamp(20px, 4vw, 28px);
+            height: clamp(20px, 4vw, 28px);
             border-radius: 50%;
-            margin: 0 8px;
+            margin: 0 clamp(6px, 1.5vw, 10px);
             background: #6c757d;
             transition: all 0.3s ease;
             border: 2px solid rgba(255, 255, 255, 0.3);
@@ -193,7 +225,7 @@
         }
         
         .gate-open-text {
-            font-size: 3rem;
+            font-size: clamp(2rem, 6vw, 3rem);
             font-weight: bold;
             color: #ffc107;
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
@@ -208,110 +240,78 @@
         
         .current-time-display {
             text-align: center;
+            font-size: clamp(0.8rem, 2vw, 1rem);
         }
         
-        /* Enhanced touch responsiveness for 1920x1200 display */
         .btn-info {
             background: linear-gradient(45deg, #17a2b8, #138496);
             border: none;
-            border-radius: 15px;
-            padding: 20px 40px;
+            border-radius: 12px;
+            padding: clamp(12px, 2vw, 16px) clamp(20px, 4vw, 32px);
             font-weight: bold;
-            font-size: 1.2rem;
-            min-height: 60px;
+            font-size: clamp(1rem, 2.5vw, 1.1rem);
+            min-height: clamp(50px, 8vh, 60px);
             transition: all 0.3s ease;
         }
         
         .btn-outline-warning, .btn-outline-primary {
-            padding: 18px 35px;
-            font-size: 1.1rem;
-            min-height: 55px;
+            padding: clamp(10px, 2vw, 14px) clamp(18px, 3.5vw, 28px);
+            font-size: clamp(0.9rem, 2.2vw, 1rem);
+            min-height: clamp(45px, 7vh, 55px);
             border-width: 2px;
-            border-radius: 15px;
-        }
-        
-        .control-panel {
-            background: linear-gradient(45deg, #f8f9fa, #e9ecef);
-            border-radius: 20px;
-            padding: 2.5rem;
-            margin-bottom: 2rem;
-        }
-        
-        .status-display {
-            background: linear-gradient(45deg, #28a745, #20c997);
-            color: white;
-            border-radius: 20px;
-            padding: 2.5rem;
-            text-align: center;
-            margin-bottom: 2rem;
+            border-radius: 12px;
         }
         
         .form-label {
-            font-size: 1.1rem;
-            margin-bottom: 0.8rem;
+            font-size: clamp(1rem, 2.2vw, 1.1rem);
+            margin-bottom: clamp(0.5rem, 1vh, 0.8rem);
         }
         
         .form-text {
-            font-size: 1rem;
-        }
-        
-        .total-time-display {
-            background: linear-gradient(45deg, #6c757d, #495057);
-            color: white;
-            border-radius: 15px;
-            padding: 1.5rem;
-            text-align: center;
-            font-size: 1.5rem;
-            font-weight: bold;
-        }
-        
-        /* Larger touch targets for status indicators */
-        .status-indicator {
-            display: inline-block;
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            margin: 0 12px;
-            background: #6c757d;
-            transition: all 0.3s ease;
-            border: 3px solid rgba(255, 255, 255, 0.3);
+            font-size: clamp(0.85rem, 2vw, 1rem);
         }
         
         /* Better spacing for button groups */
         .d-grid.gap-3 {
-            gap: 1.5rem !important;
+            gap: clamp(1rem, 2vh, 1.5rem) !important;
         }
         
-        @media (min-width: 1200px) {
-            .main-container {
-                max-width: 900px;
-                margin: 0 auto;
-            }
-            
-            .countdown-display {
-                font-size: 6rem;
-            }
-            
-            .phase-indicator {
-                font-size: 2rem;
-            }
+        /* Responsive container adjustments */
+        .container-fluid {
+            padding: clamp(0.5rem, 1vw, 1rem);
+        }
+        
+        .main-container {
+            max-width: min(95vw, 900px);
+            margin: 0 auto;
+        }
+        
+        /* Ensure everything fits in viewport */
+        .row {
+            margin: 0;
+            height: 100%;
+        }
+        
+        .col-lg-8, .col-xl-6 {
+            padding: 0;
+            height: 100%;
         }
     </style>
 </head>
 <body>
-    <div class="container-fluid py-4">
-        <div class="row justify-content-center">
-            <div class="col-lg-8 col-xl-6">
-                <div class="main-container p-4">
+    <div class="container-fluid">
+        <div class="row justify-content-center h-100">
+            <div class="col-lg-8 col-xl-6 h-100">
+                <div class="main-container p-3 h-100 d-flex flex-column">
                     <!-- Header -->
-                    <div class="text-center mb-4">
-                        <h1 class="display-4 fw-bold text-primary">Luge Relay Training</h1>
-                        <p class="lead text-muted">Configure and control your relay timing</p>
-                        <div class="mt-3">
-                            <a href="/test" class="btn btn-outline-warning btn-lg me-3">
+                    <div class="text-center mb-2 flex-shrink-0">
+                        <h1 class="fw-bold text-primary" style="font-size: clamp(1.5rem, 4vw, 2.5rem); margin-bottom: 0.5rem;">Luge Relay Training</h1>
+                        <p class="text-muted mb-2" style="font-size: clamp(0.9rem, 2vw, 1.1rem);">Configure and control relay gates</p>
+                        <div>
+                            <a href="/test" class="btn btn-outline-warning me-2">
                                 Test Mode
                             </a>
-                            <a href="/settings" class="btn btn-outline-primary btn-lg">
+                            <a href="/settings" class="btn btn-outline-primary">
                                 Settings
                             </a>
                         </div>
@@ -319,21 +319,21 @@
                     
                     
                     <!-- Status Display -->
-                    <div id="statusDisplay" class="status-display status-idle">
+                    <div id="statusDisplay" class="status-display status-idle flex-shrink-0">
                         <div id="countdownDisplay" class="countdown-display">Ready</div>
                         <div id="phaseIndicator" class="phase-indicator">System Ready</div>
                         
-                        <div class="sequence-progress mt-3">
+                        <div class="sequence-progress mt-2">
                             <div id="progressBar" class="progress-bar" style="width: 0%"></div>
                         </div>
                         
                         <!-- Current Time Display -->
-                        <div class="current-time-display mt-2">
+                        <div class="current-time-display mt-1">
                             <small class="text-white-50">Current Time: <span id="currentTimeDisplay">0.0s</span></small>
                         </div>
                         
                         <!-- Status Indicator Lights -->
-                        <div class="mt-3">
+                        <div class="mt-2">
                             <span class="status-indicator red-indicator" id="sequenceActiveIndicator" title="Sequence Active"></span>
                             <span class="status-indicator yellow-indicator" id="secondBeepIndicator" title="After Second Beep"></span>
                             <span class="status-indicator green-indicator" id="gateOpenIndicator" title="Gate Open"></span>
@@ -341,43 +341,43 @@
                     </div>
                     
                     <!-- Control Panel -->
-                    <div class="control-panel">
-                        <h3 class="mb-4 text-center">Sequence Configuration</h3>
+                    <div class="control-panel flex-grow-1 d-flex flex-column">
+                        <h3 class="mb-3 text-center" style="font-size: clamp(1.2rem, 3vw, 1.5rem);">Sequence Configuration</h3>
                         
                         <!-- Delay 1 Control -->
                         <div class="mb-4">
-                            <label for="delay1Slider" class="form-label fw-bold">
+                            <label for="delay1Slider" class="form-label fw-bold mb-2">
                                 Delay 1 (Beep 1 → Beep 2): <span id="delay1Value" class="delay-value">{{ default_delay1 }}s</span>
                             </label>
                             <input type="range" class="form-range" id="delay1Slider" 
                                    min="1" max="15" step="0.5" value="{{ default_delay1 }}">
-                            <div class="form-text">Time between first and second beep</div>
+                            <div class="form-text mt-2">Time between first and second beep</div>
                         </div>
                         
                         <!-- Delay 2 Control -->
                         <div class="mb-4">
-                            <label for="delay2Slider" class="form-label fw-bold">
+                            <label for="delay2Slider" class="form-label fw-bold mb-2">
                                 Delay 2 (Beep 2 → Beep 3): <span id="delay2Value" class="delay-value">{{ default_delay2 }}s</span>
                             </label>
                             <input type="range" class="form-range" id="delay2Slider" 
                                    min="1" max="15" step="0.5" value="{{ default_delay2 }}">
-                            <div class="form-text">Time between second beep and gate open cue</div>
+                            <div class="form-text mt-2">Time between second beep and gate open cue</div>
                         </div>
                         
                         <!-- Total Time Display -->
-                        <div class="total-time-display mb-4">
-                            Total Sequence Time: <span id="totalTimeDisplay">0</span> seconds
+                        <div class="total-time-display mb-3">
+                            Sequence Timing: <span id="totalTimeDisplay">0</span> seconds
                         </div>
                         
                         <!-- Control Buttons -->
-                        <div class="d-grid gap-3 d-md-flex justify-content-md-center">
-                            <button id="startButton" class="btn btn-success btn-lg">
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-center mt-auto">
+                            <button id="startButton" class="btn btn-success">
                                 Start Sequence
                             </button>
-                            <button id="randomButton" class="btn btn-info btn-lg">
-                                Start Random
+                            <button id="randomButton" class="btn btn-info">
+                                Set Random
                             </button>
-                            <button id="stopButton" class="btn btn-danger btn-lg" style="display: none;">
+                            <button id="stopButton" class="btn btn-danger" style="display: none;">
                                 Stop Sequence
                             </button>
                         </div>
@@ -388,10 +388,10 @@
         </div>
         
         <!-- Relay Status Indicator (Bottom Right) -->
-        <div class="position-fixed" style="bottom: 20px; right: 20px; z-index: 1000;">
-            <div class="d-flex align-items-center bg-dark rounded-pill px-3 py-2 shadow">
-                <span class="text-white me-2 small">Relay:</span>
-                <span class="status-indicator blue-indicator" id="relayIndicator" title="Relay Status" style="width: 20px; height: 20px;"></span>
+        <div class="position-fixed" style="bottom: 10px; right: 10px; z-index: 1000;">
+            <div class="d-flex align-items-center bg-dark rounded-pill px-2 py-1 shadow" style="font-size: clamp(0.7rem, 1.5vw, 0.9rem);">
+                <span class="text-white me-1">Relay:</span>
+                <span class="status-indicator blue-indicator" id="relayIndicator" title="Relay Status" style="width: clamp(16px, 3vw, 20px); height: clamp(16px, 3vw, 20px);"></span>
             </div>
         </div>
     </div>
