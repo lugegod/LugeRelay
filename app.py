@@ -1,6 +1,6 @@
 
 import os
-import subprocess
+import sys
 import threading
 import time
 import json
@@ -86,7 +86,7 @@ class TimingSequence:
     def __init__(self, delay1, delay2):
         self.delay1 = delay1  # Delay between beep 1 and beep 2
         self.delay2 = delay2  # Delay between beep 2 and beep 3
-        self.total_time = delay1 + delay2 + 1  # +1 for final beep duration + gate open time
+        self.total_time = delay1 + delay2 + app.config['GATE_OPEN_DURATION']
         
     def get_sequence_timeline(self, alignment_offset=0):
         """Returns timeline of events in seconds from start"""
@@ -100,13 +100,13 @@ class TimingSequence:
             'beep3': beep3_time,
             'gate_open': gate_open_time,  # Immediately after beep 3
             'relay_activation': relay_activation_time,  # Relay activation with alignment offset
-            'reset': gate_open_time + 1  # 1 second after gate open
+            'reset': gate_open_time + app.config['GATE_OPEN_DURATION']
         }
 
 class TestSequence:
     def __init__(self, offset):
         self.offset = offset  # Beep-relay alignment offset
-        self.total_time = 3.0  # 3 seconds silence + beep + relay
+        self.total_time = 3.0 + app.config['GATE_OPEN_DURATION']
         
     def get_sequence_timeline(self):
         """Returns timeline of events in seconds from start"""
@@ -120,7 +120,7 @@ class TestSequence:
             'beep3': beep_time,
             'gate_open': gate_open_time,  # Immediately after beep
             'relay_activation': relay_activation_time,  # Relay activation with offset
-            'reset': gate_open_time + 1  # 1 second after gate open
+            'reset': gate_open_time + app.config['GATE_OPEN_DURATION']
         }
 
 def init_audio():
@@ -159,6 +159,7 @@ def init_audio():
 
 def play_audio_file(filename):
     """Play an audio file using pygame with fallback initialization"""
+    audio_path = os.path.join(app.config['AUDIO_DIR'], filename)
     try:
         # Check if audio system is still initialized
         if pygame.mixer.get_init() is None:
@@ -166,10 +167,14 @@ def play_audio_file(filename):
             if not init_audio():
                 print("Failed to reinitialize audio system")
                 return False
-        
-        audio_path = os.path.join(app.config['AUDIO_DIR'], filename)
+
         if os.path.exists(audio_path):
             sound = pygame.mixer.Sound(audio_path)
+            # Apply configured volume to this sound (0.0 - 1.0)
+            try:
+                sound.set_volume(app.config['AUDIO_VOLUME'])
+            except Exception:
+                pass
             sound.play()
             print(f"Playing audio: {filename}")
             return True
@@ -183,6 +188,10 @@ def play_audio_file(filename):
         if init_audio():
             try:
                 sound = pygame.mixer.Sound(audio_path)
+                try:
+                    sound.set_volume(app.config['AUDIO_VOLUME'])
+                except Exception:
+                    pass
                 sound.play()
                 print(f"Successfully played audio after reinitialization: {filename}")
                 return True
@@ -326,8 +335,10 @@ def run_sequence(sequence):
                     time.sleep(0.1)
             set_relay_state(True)
         
-        # Wait for gate open duration (1 second)
-        for _ in range(10):  # Check every 0.1 seconds for 1 second
+        # Wait for configured gate open duration
+        gate_open_duration = app.config['GATE_OPEN_DURATION']
+        steps = max(1, int(gate_open_duration * 10))
+        for _ in range(steps):  # Check every 0.1 seconds
             if sequence_stopped:
                 return
             time.sleep(0.1)
@@ -417,8 +428,10 @@ def run_test_sequence(sequence):
                     time.sleep(0.1)
             set_relay_state(True)
         
-        # Wait for gate open duration (1 second)
-        for _ in range(10):  # Check every 0.1 seconds for 1 second
+        # Wait for configured gate open duration
+        gate_open_duration = app.config['GATE_OPEN_DURATION']
+        steps = max(1, int(gate_open_duration * 10))
+        for _ in range(steps):  # Check every 0.1 seconds
             if sequence_stopped:
                 return
             time.sleep(0.1)
@@ -461,10 +474,12 @@ def start_sequence():
         delay1 = float(data.get('delay1', app.config['DEFAULT_DELAY1']))
         delay2 = float(data.get('delay2', app.config['DEFAULT_DELAY2']))
         
-        # Validate delays
-        total_time = delay1 + delay2 + 1  # +1 for beep duration + gate open time
-        if total_time < 6 or total_time > 18:
-            return jsonify({'success': False, 'message': 'Total sequence time must be between 6-18 seconds'})
+        # Validate delays using configured constraints
+        total_time = delay1 + delay2 + app.config['GATE_OPEN_DURATION']
+        min_total = app.config['MIN_TOTAL_TIME']
+        max_total = app.config['MAX_TOTAL_TIME']
+        if total_time < min_total or total_time > max_total:
+            return jsonify({'success': False, 'message': f'Total sequence time must be between {min_total:.1f}-{max_total:.1f} seconds'})
         
         sequence = TimingSequence(delay1, delay2)
         
@@ -488,10 +503,20 @@ def set_random_values():
         # Generate delay1 between 1-8 seconds
         delay1 = round(random.uniform(1.0, 8.0), 1)
         
-        # Generate delay2 between delay1+0.5 and 12 seconds (ensuring delay2 > delay1)
-        min_delay2 = delay1 + 0.5
-        max_delay2 = min(12.0, 18.0 - delay1 - 1)  # Ensure total time doesn't exceed 18s
-        delay2 = round(random.uniform(min_delay2, max_delay2), 1)
+        # Generate delay2 within configured bounds and ensuring delay2 > delay1
+        min_total = app.config['MIN_TOTAL_TIME']
+        max_total = app.config['MAX_TOTAL_TIME']
+        gate_open_duration = app.config['GATE_OPEN_DURATION']
+        
+        min_delay2 = max(delay1 + 0.5, min_total - delay1 - gate_open_duration)
+        max_delay2 = min(12.0, max_total - delay1 - gate_open_duration)
+        
+        if min_delay2 >= max_delay2:
+            # Fallback to safe values if random generation window is invalid
+            delay1 = 3.0
+            delay2 = 5.0
+        else:
+            delay2 = round(random.uniform(min_delay2, max_delay2), 1)
         
         # Validate total time
         total_time = delay1 + delay2 + 1
@@ -597,7 +622,7 @@ def sequence_status():
         elif get_relay_status():
             # Gate is open as long as relay is active
             phase = 'gate_open'
-            countdown = 0  # No countdown, just show "GATE OPEN"
+            countdown = max(0, timeline['reset'] - current_time)
         else:
             phase = 'complete'
             countdown = 0
@@ -613,7 +638,7 @@ def sequence_status():
         elif get_relay_status():
             # Gate is open as long as relay is active
             phase = 'gate_open'
-            countdown = 0  # No countdown, just show "GATE OPEN"
+            countdown = max(0, timeline['reset'] - current_time)
         else:
             phase = 'complete'
             countdown = 0
@@ -627,41 +652,11 @@ def sequence_status():
         'total_time': current_sequence.total_time,
         'phase': phase,
         'countdown': countdown,
-        'timeline': timeline
+        'timeline': timeline,
+        'relay_active': get_relay_status()
     })
 
-@app.route('/bluetooth_scan', methods=['POST'])
-def bluetooth_scan():
-    """Trigger a bounded Bluetooth scan using bluetoothctl."""
-
-    def _scan():
-        proc = None
-        try:
-            proc = subprocess.Popen(
-                ['bluetoothctl'],
-                stdin=subprocess.PIPE,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                text=True
-            )
-            proc.stdin.write('scan on\n')
-            proc.stdin.flush()
-            time.sleep(5)
-            proc.stdin.write('scan off\n')
-            proc.stdin.flush()
-        except Exception as e:
-            print(f"Bluetooth scan error: {e}")
-        finally:
-            if proc:
-                try:
-                    proc.terminate()
-                    proc.wait(timeout=5)
-                except Exception:
-                    proc.kill()
-
-    thread = threading.Thread(target=_scan, daemon=True)
-    thread.start()
-    return jsonify({'success': True, 'message': 'Bluetooth scan started'})
+    # Note: Bluetooth scan endpoint removed as it's unused.
 
 @app.route('/audio/<filename>')
 def serve_audio(filename):

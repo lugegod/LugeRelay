@@ -536,9 +536,22 @@
             }
             
             startStatusPolling() {
-                this.statusInterval = setInterval(() => {
-                    this.updateSequenceStatus();
-                }, 100); // Poll every 100ms
+                this.fetchIntervalsAndStartPolling();
+            }
+
+            async fetchIntervalsAndStartPolling() {
+                try {
+                    const resp = await fetch('/get_settings');
+                    const cfg = await resp.json();
+                    const interval = Math.max(50, parseInt(cfg.auto_refresh_interval || 100));
+                    this.statusInterval = setInterval(() => {
+                        this.updateSequenceStatus();
+                    }, interval);
+                } catch (e) {
+                    this.statusInterval = setInterval(() => {
+                        this.updateSequenceStatus();
+                    }, 100);
+                }
             }
             
             async updateSequenceStatus() {

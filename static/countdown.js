@@ -67,16 +67,26 @@ class TimingSequenceController {
         this.updateTotalTime();
     }
     
-    updateTotalTime() {
+    async updateTotalTime() {
         const delay1 = parseFloat(this.delay1Slider.value);
         const delay2 = parseFloat(this.delay2Slider.value);
         const totalTime = delay1 + delay2; // Only show delay1 + delay2
         
         this.totalTimeDisplay.textContent = totalTime.toFixed(1);
         
-        // Validate total time (backend will add 1 second for beep + gate open)
-        const backendTotalTime = totalTime + 1;
-        if (backendTotalTime < 6 || backendTotalTime > 18) {
+        // Validate total time using configured min/max and gate duration
+        if (!this.settingsCache) {
+            try {
+                const resp = await fetch('/get_settings');
+                this.settingsCache = await resp.json();
+            } catch (e) {
+                this.settingsCache = { min_total_time: 6, max_total_time: 18, gate_open_duration: 1 };
+            }
+        }
+        const backendTotalTime = totalTime + (this.settingsCache.gate_open_duration || 1);
+        const minTotal = this.settingsCache.min_total_time || 6;
+        const maxTotal = this.settingsCache.max_total_time || 18;
+        if (backendTotalTime < minTotal || backendTotalTime > maxTotal) {
             this.totalTimeDisplay.style.color = '#dc3545';
             this.startButton.disabled = true;
             this.startButton.textContent = 'Invalid Timing';
@@ -214,14 +224,29 @@ class TimingSequenceController {
         this.startButton.disabled = false;
         this.randomButton.disabled = false;
         this.startButton.textContent = 'Start Sequence';
-        this.randomButton.textContent = 'Start Random';
+        this.randomButton.textContent = 'Set Random';
     }
     
     startStatusPolling() {
-        this.statusInterval = setInterval(() => {
-            this.updateSequenceStatus();
-            this.updateRelayStatus();
-        }, 100); // Poll every 100ms
+        this.fetchIntervalsAndStartPolling();
+    }
+
+    async fetchIntervalsAndStartPolling() {
+        try {
+            const resp = await fetch('/get_settings');
+            const cfg = await resp.json();
+            const interval = Math.max(50, parseInt(cfg.auto_refresh_interval || 100));
+            this.statusInterval = setInterval(() => {
+                this.updateSequenceStatus();
+                this.updateRelayStatus();
+            }, interval);
+        } catch (e) {
+            // Fallback to 100ms if settings fetch fails
+            this.statusInterval = setInterval(() => {
+                this.updateSequenceStatus();
+                this.updateRelayStatus();
+            }, 100);
+        }
     }
     
     async updateSequenceStatus() {
@@ -319,10 +344,10 @@ class TimingSequenceController {
     
     async updateRelayStatus() {
         try {
-            const response = await fetch('/relay_status');
+            // Prefer using sequence status which now includes relay_active to reduce calls
+            const response = await fetch('/sequence_status');
             const status = await response.json();
-            
-            if (status.active) {
+            if (status.relay_active) {
                 this.relayIndicator.classList.add('active');
             } else {
                 this.relayIndicator.classList.remove('active');
