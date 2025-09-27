@@ -5,9 +5,18 @@ import threading
 import time
 import json
 from datetime import datetime
+from typing import Optional
 
 import pygame
 from flask import Flask, render_template, request, jsonify, send_from_directory
+
+# Serial (ESP32 integration)
+try:
+    import serial  # pyserial
+    SERIAL_AVAILABLE = True
+except Exception:
+    SERIAL_AVAILABLE = False
+    serial = None
 
 # GPIO imports - only import if available (for non-Pi systems)
 try:
@@ -78,9 +87,108 @@ sequence_stopped = False
 current_sequence = None
 sequence_start_time = None
 
+# ESP32 result persistence
+last_result_msm: Optional[str] = None  # e.g., "0:03:245"
+last_result_received_at: Optional[float] = None
+
 # Relay control
 relay_device = None
 relay_active = False
+
+# =========================
+# ESP32 Serial Manager
+# =========================
+
+class ESP32SerialManager:
+    def __init__(self, port: str, baud: int, timeout: float):
+        self.port = port
+        self.baud = baud
+        self.timeout = timeout
+        self.ser = None
+        self.reader_thread = None
+        self._stop_reader = threading.Event()
+
+    def open(self) -> bool:
+        if not SERIAL_AVAILABLE:
+            print("Warning: pyserial not available; ESP32 integration disabled")
+            return False
+        try:
+            self.ser = serial.Serial(self.port, self.baud, timeout=self.timeout)
+            print(f"Opened ESP32 serial on {self.port} @ {self.baud}")
+            self._stop_reader.clear()
+            self.reader_thread = threading.Thread(target=self._reader_loop, daemon=True)
+            self.reader_thread.start()
+            return True
+        except Exception as e:
+            print(f"Failed to open ESP32 serial on {self.port}: {e}")
+            return False
+
+    def close(self):
+        try:
+            self._stop_reader.set()
+            if self.reader_thread and self.reader_thread.is_alive():
+                self.reader_thread.join(timeout=1.0)
+        except Exception:
+            pass
+        try:
+            if self.ser:
+                self.ser.close()
+        except Exception:
+            pass
+
+    def clear_result(self):
+        global last_result_msm, last_result_received_at
+        last_result_msm = None
+        last_result_received_at = None
+
+    def send_go(self):
+        if not self.ser:
+            print("ESP32 serial not open; cannot send GO")
+            return False
+        try:
+            self.ser.write(b"GO\n")
+            self.ser.flush()
+            print("Sent GO to ESP32")
+            return True
+        except Exception as e:
+            print(f"Failed to send GO: {e}")
+            return False
+
+    def _reader_loop(self):
+        global last_result_msm, last_result_received_at
+        buffer = b""
+        while not self._stop_reader.is_set():
+            try:
+                if not self.ser:
+                    time.sleep(0.1)
+                    continue
+                data = self.ser.readline()  # reads to \n or timeout
+                if not data:
+                    continue
+                try:
+                    line = data.decode(errors='ignore').strip()
+                except Exception:
+                    continue
+                if not line:
+                    continue
+                # Debug: print received lines optionally
+                # print(f"ESP32: {line}")
+
+                # Parse result line
+                if line.startswith('[RESULT] ELAPSED_MSM='):
+                    # Format: [RESULT] ELAPSED_MSM=M:SS:MMM
+                    parts = line.split('ELAPSED_MSM=')
+                    if len(parts) == 2:
+                        result = parts[1].strip()
+                        last_result_msm = result
+                        last_result_received_at = time.time()
+                        print(f"Received result from ESP32: {result}")
+            except Exception:
+                # Keep reader alive
+                time.sleep(0.05)
+
+
+esp32_serial = None
 
 class TimingSequence:
     def __init__(self, delay1, delay2):
@@ -203,6 +311,10 @@ def init_relay():
     """Initialize the relay GPIO device"""
     global relay_device
     
+    # If using ESP32 for relay control, skip local GPIO init
+    if app.config.get('USE_ESP32', False):
+        print("Using ESP32 for relay control - skipping local GPIO relay init")
+        return True
     if not GPIO_AVAILABLE:
         print("GPIO not available - relay will be simulated")
         return True
@@ -221,6 +333,11 @@ def init_relay():
 def set_relay_state(active):
     """Set the relay state (True = active, False = inactive)"""
     global relay_active
+    
+    # If using ESP32 for relay control, do not drive local GPIO
+    if app.config.get('USE_ESP32', False):
+        relay_active = active
+        return
     
     relay_active = active
     
@@ -243,6 +360,30 @@ def get_relay_status():
     """Get current relay status"""
     global relay_active
     return relay_active
+
+def get_esp32_connected():
+    try:
+        if not app.config.get('USE_ESP32', False):
+            return False
+        if esp32_serial and getattr(esp32_serial, 'ser', None):
+            return bool(esp32_serial.ser.is_open)
+        return False
+
+def to_seconds_millis(result_msm: Optional[str]) -> Optional[str]:
+    """Convert M:SS:MMM to SS.MMM (seconds.milliseconds) with seconds zero-padded to 2 digits."""
+    if not result_msm:
+        return None
+    try:
+        parts = result_msm.strip().split(':')
+        if len(parts) != 3:
+            return None
+        minutes = int(parts[0])
+        seconds = int(parts[1])
+        millis = int(parts[2])
+        total_seconds = minutes * 60 + seconds
+        return f"{total_seconds:02d}.{millis:03d}"
+    except Exception:
+        return None
 
 def run_sequence(sequence):
     """Run the timing sequence in a separate thread"""
@@ -326,26 +467,43 @@ def run_sequence(sequence):
         # Gate open phase starts immediately after beep 3
         print("Gate open phase")
         
-        if alignment_offset >= 0:
-            # Positive or zero offset: activate relay after beep 3
-            if alignment_offset > 0:
-                for _ in range(int(alignment_offset * 10)):  # Check every 0.1 seconds
+        if app.config.get('USE_ESP32', False) and esp32_serial:
+            # If positive offset, wait after beep 3
+            if alignment_offset >= 0 and alignment_offset > 0:
+                for _ in range(int(alignment_offset * 10)):
                     if sequence_stopped:
                         return
                     time.sleep(0.1)
-            set_relay_state(True)
-        
-        # Wait for configured gate open duration
-        gate_open_duration = app.config['GATE_OPEN_DURATION']
-        steps = max(1, int(gate_open_duration * 10))
-        for _ in range(steps):  # Check every 0.1 seconds
-            if sequence_stopped:
-                return
-            time.sleep(0.1)
-        
-        set_relay_state(False)  # Deactivate relay
-        
-        print("Sequence completed successfully")
+            # Send GO to ESP32 and wait for result
+            esp32_serial.clear_result()
+            esp32_serial.send_go()
+            set_relay_state(True)   # reflect UI as gate open while waiting
+            deadline = time.time() + float(app.config.get('RESULT_WAIT_TIMEOUT', 15.0))
+            while time.time() < deadline:
+                if sequence_stopped:
+                    return
+                if last_result_msm:
+                    break
+                time.sleep(0.05)
+            set_relay_state(False)
+            print("Sequence completed (awaited ESP32 result)")
+        else:
+            # Fallback to local GPIO control if not using ESP32
+            if alignment_offset >= 0:
+                if alignment_offset > 0:
+                    for _ in range(int(alignment_offset * 10)):
+                        if sequence_stopped:
+                            return
+                        time.sleep(0.1)
+                set_relay_state(True)
+            gate_open_duration = app.config['GATE_OPEN_DURATION']
+            steps = max(1, int(gate_open_duration * 10))
+            for _ in range(steps):  # Check every 0.1 seconds
+                if sequence_stopped:
+                    return
+                time.sleep(0.1)
+            set_relay_state(False)
+            print("Sequence completed successfully")
         
     except Exception as e:
         print(f"Sequence error: {e}")
@@ -419,26 +577,40 @@ def run_test_sequence(sequence):
         # Gate open phase starts immediately after beep
         print("Gate open phase")
         
-        if offset >= 0:
-            # Positive or zero offset: activate relay after beep
-            if offset > 0:
-                for _ in range(int(offset * 10)):  # Check every 0.1 seconds
+        if app.config.get('USE_ESP32', False) and esp32_serial:
+            if offset >= 0 and offset > 0:
+                for _ in range(int(offset * 10)):
                     if sequence_stopped:
                         return
                     time.sleep(0.1)
+            esp32_serial.clear_result()
+            esp32_serial.send_go()
             set_relay_state(True)
-        
-        # Wait for configured gate open duration
-        gate_open_duration = app.config['GATE_OPEN_DURATION']
-        steps = max(1, int(gate_open_duration * 10))
-        for _ in range(steps):  # Check every 0.1 seconds
-            if sequence_stopped:
-                return
-            time.sleep(0.1)
-        
-        set_relay_state(False)  # Deactivate relay
-        
-        print("Test sequence completed successfully")
+            deadline = time.time() + float(app.config.get('RESULT_WAIT_TIMEOUT', 15.0))
+            while time.time() < deadline:
+                if sequence_stopped:
+                    return
+                if last_result_msm:
+                    break
+                time.sleep(0.05)
+            set_relay_state(False)
+            print("Test sequence completed (awaited ESP32 result)")
+        else:
+            if offset >= 0:
+                if offset > 0:
+                    for _ in range(int(offset * 10)):
+                        if sequence_stopped:
+                            return
+                        time.sleep(0.1)
+                set_relay_state(True)
+            gate_open_duration = app.config['GATE_OPEN_DURATION']
+            steps = max(1, int(gate_open_duration * 10))
+            for _ in range(steps):  # Check every 0.1 seconds
+                if sequence_stopped:
+                    return
+                time.sleep(0.1)
+            set_relay_state(False)
+            print("Test sequence completed successfully")
         
     except Exception as e:
         print(f"Test sequence error: {e}")
@@ -591,7 +763,7 @@ def stop_sequence():
 @app.route('/sequence_status')
 def sequence_status():
     """Get current sequence status for real-time updates"""
-    global sequence_running, current_sequence, sequence_start_time, sequence_stopped
+    global sequence_running, current_sequence, sequence_start_time, sequence_stopped, last_result_msm
     
     # If sequence was stopped, immediately return idle state
     if sequence_stopped:
@@ -599,7 +771,12 @@ def sequence_status():
             'running': False,
             'current_time': 0,
             'total_time': 0,
-            'phase': 'idle'
+            'phase': 'idle',
+            'relay_active': get_relay_status(),
+            'esp32_connected': get_esp32_connected(),
+            'using_esp32': bool(app.config.get('USE_ESP32', False)),
+            'final_time_msm': last_result_msm,
+            'final_time_sm': to_seconds_millis(last_result_msm)
         })
     
     if not sequence_running or not current_sequence or not sequence_start_time:
@@ -607,7 +784,12 @@ def sequence_status():
             'running': False,
             'current_time': 0,
             'total_time': 0,
-            'phase': 'idle'
+            'phase': 'idle',
+            'relay_active': get_relay_status(),
+            'esp32_connected': get_esp32_connected(),
+            'using_esp32': bool(app.config.get('USE_ESP32', False)),
+            'final_time_msm': last_result_msm,
+            'final_time_sm': to_seconds_millis(last_result_msm)
         })
     
     current_time = time.time() - sequence_start_time
@@ -653,10 +835,12 @@ def sequence_status():
         'phase': phase,
         'countdown': countdown,
         'timeline': timeline,
-        'relay_active': get_relay_status()
+        'relay_active': get_relay_status(),
+        'esp32_connected': get_esp32_connected(),
+        'using_esp32': bool(app.config.get('USE_ESP32', False)),
+        'final_time_msm': last_result_msm,
+        'final_time_sm': to_seconds_millis(last_result_msm)
     })
-
-    # Note: Bluetooth scan endpoint removed as it's unused.
 
 @app.route('/audio/<filename>')
 def serve_audio(filename):
@@ -793,6 +977,16 @@ if __name__ == '__main__':
     if not init_audio():
         print("Warning: Audio system not initialized. Audio playback will not work.")
     
+    # Initialize ESP32 serial if enabled
+    if app.config.get('USE_ESP32', False):
+        esp32_port = app.config.get('SERIAL_PORT')
+        esp32_baud = app.config.get('SERIAL_BAUD')
+        esp32_timeout = app.config.get('SERIAL_TIMEOUT')
+        esp32_serial = ESP32SerialManager(esp32_port, esp32_baud, esp32_timeout)
+        if not esp32_serial.open():
+            print("Warning: Could not open ESP32 serial. Falling back to local GPIO relay control.")
+            app.config['USE_ESP32'] = False
+
     # Initialize relay system
     if not init_relay():
         print("Warning: Relay system not initialized. Relay control will not work.")

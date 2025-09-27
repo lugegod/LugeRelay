@@ -30,6 +30,7 @@ class TimingSequenceController {
         this.secondBeepIndicator = document.getElementById('secondBeepIndicator');
         this.gateOpenIndicator = document.getElementById('gateOpenIndicator');
         this.relayIndicator = document.getElementById('relayIndicator');
+        this.lightsStatusText = document.getElementById('lightsStatusText');
         
         // Buttons
         this.startButton = document.getElementById('startButton');
@@ -291,6 +292,13 @@ class TimingSequenceController {
         // Update current time display
         this.currentTimeDisplay.textContent = status.current_time ? status.current_time.toFixed(1) + 's' : '0.0s';
         
+        // If we have a final time from ESP32, display SS:MMM (00:000) and persist until next run
+        if (status.final_time_sm) {
+            this.countdownDisplay.textContent = status.final_time_sm;
+            this.phaseIndicator.textContent = 'Result';
+            return;
+        }
+
         if (status.phase === 'delay1') {
             const countdown = Math.max(0, status.countdown);
             this.countdownDisplay.textContent = countdown.toFixed(1);
@@ -305,7 +313,7 @@ class TimingSequenceController {
             this.phaseIndicator.textContent = 'Test Mode: Silence until final beep';
         } else if (status.phase === 'gate_open') {
             this.countdownDisplay.textContent = 'GATE OPEN';
-            this.phaseIndicator.textContent = 'Gate Open - Relay Active';
+            this.phaseIndicator.textContent = 'Gate Open - Waiting for result';
         } else if (status.phase === 'complete') {
             this.countdownDisplay.textContent = 'Complete!';
             this.phaseIndicator.textContent = 'Sequence Finished - Ready for Next Run';
@@ -344,13 +352,24 @@ class TimingSequenceController {
     
     async updateRelayStatus() {
         try {
-            // Prefer using sequence status which now includes relay_active to reduce calls
+            // Prefer using sequence status which now includes relay_active and esp32_connected
             const response = await fetch('/sequence_status');
             const status = await response.json();
             if (status.relay_active) {
                 this.relayIndicator.classList.add('active');
             } else {
                 this.relayIndicator.classList.remove('active');
+            }
+
+            // Update Lights connection status
+            if (status.using_esp32) {
+                this.lightsStatusText.textContent = status.esp32_connected ? 'Connected' : 'Disconnected';
+                this.lightsStatusText.classList.toggle('text-white', status.esp32_connected);
+                this.lightsStatusText.classList.toggle('text-white-50', !status.esp32_connected);
+            } else {
+                this.lightsStatusText.textContent = 'Local GPIO';
+                this.lightsStatusText.classList.add('text-white-50');
+                this.lightsStatusText.classList.remove('text-white');
             }
         } catch (error) {
             console.error('Error updating relay status:', error);

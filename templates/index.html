@@ -387,11 +387,13 @@
             </div>
         </div>
         
-        <!-- Relay Status Indicator (Bottom Right) -->
+        <!-- Relay and Lights Status Indicators (Bottom Right) -->
         <div class="position-fixed" style="bottom: 10px; right: 10px; z-index: 1000;">
             <div class="d-flex align-items-center bg-dark rounded-pill px-2 py-1 shadow" style="font-size: clamp(0.7rem, 1.5vw, 0.9rem);">
                 <span class="text-white me-1">Relay:</span>
                 <span class="status-indicator blue-indicator" id="relayIndicator" title="Relay Status" style="width: clamp(16px, 3vw, 20px); height: clamp(16px, 3vw, 20px);"></span>
+                <span class="text-white ms-3 me-1">Lights:</span>
+                <span id="lightsStatusText" class="text-white-50">Disconnected</span>
             </div>
         </div>
     </div>

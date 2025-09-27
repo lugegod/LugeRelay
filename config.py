@@ -36,3 +36,10 @@ class Config:
     RELAY_ACTIVE_HIGH = True
     GATE_OPEN_DURATION = 1.0
     BEEP_RELAY_ALIGNMENT = 0.0  # Alignment offset in seconds (negative = beep early, positive = beep late)
+
+    # ESP32 serial integration
+    USE_ESP32 = True
+    SERIAL_PORT = os.environ.get('ESP32_SERIAL_PORT', '/dev/ttyACM0')
+    SERIAL_BAUD = int(os.environ.get('ESP32_SERIAL_BAUD', '115200'))
+    SERIAL_TIMEOUT = float(os.environ.get('ESP32_SERIAL_TIMEOUT', '0.1'))  # seconds
+    RESULT_WAIT_TIMEOUT = float(os.environ.get('ESP32_RESULT_WAIT_TIMEOUT', '15.0'))  # seconds

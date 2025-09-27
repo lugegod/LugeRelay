@@ -31,7 +31,8 @@ constexpr bool RELAY_ACTIVE_HIGH = true;  // set false for active-LOW relay boar
 constexpr bool SENSOR_ACTIVE_LOW = true;  // DFR0911 open-collector sinking -> active LOW
 
 // Behavior configuration
-constexpr uint32_t AUTO_START_DELAY_MS = 2000;
+constexpr uint32_t AUTO_START_DELAY_MS = 2000;   // set to 0 or disable via AUTO_START_ENABLED when integrating with Pi
+constexpr bool     AUTO_START_ENABLED  = false;   // disable auto-start when controlled by Raspberry Pi
 constexpr uint32_t TRIP_TIMEOUT_MS     = 10000;
 constexpr uint32_t DEBOUNCE_US         = 4000;   // 4 ms debounce
 constexpr bool     RELAY_OFF_AFTER_TRIP = true;  // turn relay off after sensor trips
@@ -63,8 +64,6 @@ volatile uint64_t g_lastIsrChangeUs = 0;       // last time a logical edge was p
 
 enum class RunState : uint8_t {
   IDLE,
-  ARMED,
-  RELAY_ON,
   WAIT_TRIP,
   DONE
 };
@@ -211,6 +210,12 @@ void finishRunSuccess(uint64_t tRelayOnUs, uint64_t tTripUs) {
                 (unsigned long)seconds,
                 (unsigned long)millisPart);
 
+  // Print compact SS.MMM for Pi (same info, different format)
+  const uint32_t totalSeconds = (minutes * 60U) + seconds;
+  Serial.printf("[RESULT] ELAPSED_SM=%02lu.%03lu\n",
+                (unsigned long)totalSeconds,
+                (unsigned long)millisPart);
+
   g_state = RunState::DONE;
 }
 
@@ -259,6 +264,7 @@ void setup() {
 }
 
 static inline bool shouldAutoStartNow() {
+  if (!AUTO_START_ENABLED) return false;
   if (g_autoStarted) return false;
   const uint32_t elapsed = nowMs() - g_bootMs;
   return (elapsed >= AUTO_START_DELAY_MS);
@@ -314,14 +320,6 @@ void loop() {
   switch (g_state) {
     case RunState::IDLE:
       // Nothing else; waiting for auto-start or GO
-      break;
-
-    case RunState::ARMED:
-      // This implementation arms and immediately transitions, so ARMED is not held
-      break;
-
-    case RunState::RELAY_ON:
-      // Not used as an intermediate state; directly go to WAIT_TRIP in startRun()
       break;
 
     case RunState::WAIT_TRIP: {

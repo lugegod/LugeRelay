@@ -8,3 +8,4 @@ itsdangerous==2.1.2
 click==8.1.7
 blinker==1.6.3
 gpiozero
+pyserial>=3.5
