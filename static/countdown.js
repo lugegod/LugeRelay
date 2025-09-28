@@ -269,6 +269,8 @@ class TimingSequenceController {
                     this.resetCountdown();
                     this.hideStopButton();
                 }
+                // Always update countdown when sequence is not running to show result
+                this.updateCountdown(status);
             }
         } catch (error) {
             console.error('Error updating status:', error);
@@ -292,34 +294,46 @@ class TimingSequenceController {
         // Update current time display
         this.currentTimeDisplay.textContent = status.current_time ? status.current_time.toFixed(1) + 's' : '0.0s';
         
-        // If we have a final time from ESP32, display SS:MMM (00:000) and persist until next run
-        if (status.final_time_sm) {
+        // If we have a final time from ESP32 and sequence is not running, display the result
+        if (status.final_time_sm && !status.running) {
             this.countdownDisplay.textContent = status.final_time_sm;
             this.phaseIndicator.textContent = 'Result';
             return;
         }
 
-        if (status.phase === 'delay1') {
-            const countdown = Math.max(0, status.countdown);
-            this.countdownDisplay.textContent = countdown.toFixed(1);
-            this.phaseIndicator.textContent = 'Delay 1: Countdown to Beep 2';
-        } else if (status.phase === 'delay2') {
-            const countdown = Math.max(0, status.countdown);
-            this.countdownDisplay.textContent = countdown.toFixed(1);
-            this.phaseIndicator.textContent = 'Delay 2: Countdown to Gate';
-        } else if (status.phase === 'test_silence') {
-            const countdown = Math.max(0, status.countdown);
-            this.countdownDisplay.textContent = countdown.toFixed(1);
-            this.phaseIndicator.textContent = 'Test Mode: Silence until final beep';
-        } else if (status.phase === 'gate_open') {
-            this.countdownDisplay.textContent = 'GATE OPEN';
-            this.phaseIndicator.textContent = 'Gate Open - Waiting for result';
-        } else if (status.phase === 'complete') {
-            this.countdownDisplay.textContent = 'Complete!';
-            this.phaseIndicator.textContent = 'Sequence Finished - Ready for Next Run';
+        // If sequence is running, show countdown based on phase
+        if (status.running) {
+            if (status.phase === 'delay1') {
+                const countdown = Math.max(0, status.countdown);
+                this.countdownDisplay.textContent = countdown.toFixed(1);
+                this.phaseIndicator.textContent = 'Delay 1: Countdown to Beep 2';
+            } else if (status.phase === 'delay2') {
+                const countdown = Math.max(0, status.countdown);
+                this.countdownDisplay.textContent = countdown.toFixed(1);
+                this.phaseIndicator.textContent = 'Delay 2: Countdown to Gate';
+            } else if (status.phase === 'test_silence') {
+                const countdown = Math.max(0, status.countdown);
+                this.countdownDisplay.textContent = countdown.toFixed(1);
+                this.phaseIndicator.textContent = 'Test Mode: Silence until final beep';
+            } else if (status.phase === 'gate_open') {
+                this.countdownDisplay.textContent = 'GATE OPEN';
+                this.phaseIndicator.textContent = 'Gate Open - Waiting for result';
+            } else if (status.phase === 'complete') {
+                this.countdownDisplay.textContent = 'Complete!';
+                this.phaseIndicator.textContent = 'Sequence Finished - Ready for Next Run';
+            } else {
+                this.countdownDisplay.textContent = 'Ready';
+                this.phaseIndicator.textContent = 'System Ready';
+            }
         } else {
-            this.countdownDisplay.textContent = 'Ready';
-            this.phaseIndicator.textContent = 'System Ready';
+            // Sequence not running - show Ready or Result
+            if (status.final_time_sm) {
+                this.countdownDisplay.textContent = status.final_time_sm;
+                this.phaseIndicator.textContent = 'Result';
+            } else {
+                this.countdownDisplay.textContent = 'Ready';
+                this.phaseIndicator.textContent = 'System Ready';
+            }
         }
         
     }
@@ -384,8 +398,8 @@ class TimingSequenceController {
     }
     
     resetCountdown() {
-        this.countdownDisplay.textContent = 'Ready';
-        this.phaseIndicator.textContent = 'System Ready';
+        // Don't reset the countdown display if we have a timing result to show
+        // The updateCountdown function will handle showing the result vs Ready
         this.currentTimeDisplay.textContent = '0.0s';
         this.progressBar.style.width = '0%';
     }

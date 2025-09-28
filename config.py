@@ -43,3 +43,7 @@ class Config:
     SERIAL_BAUD = int(os.environ.get('ESP32_SERIAL_BAUD', '115200'))
     SERIAL_TIMEOUT = float(os.environ.get('ESP32_SERIAL_TIMEOUT', '0.1'))  # seconds
     RESULT_WAIT_TIMEOUT = float(os.environ.get('ESP32_RESULT_WAIT_TIMEOUT', '15.0'))  # seconds
+    
+    # ESP32 settings
+    ESP32_GATE_DURATION_MS = 1000  # Gate open duration in milliseconds
+    ESP32_TIMING_LIGHTS_ENABLED = True  # Enable/disable timing lights (sensor waiting)

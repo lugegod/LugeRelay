@@ -39,10 +39,14 @@ constexpr bool SENSOR_ACTIVE_LOW = true;  // DFR0911 open-collector sinking -> a
 // Behavior configuration
 constexpr uint32_t AUTO_START_DELAY_MS = 2000;   // set to 0 or disable via AUTO_START_ENABLED when integrating with Pi
 constexpr bool     AUTO_START_ENABLED  = false;   // disable auto-start when controlled by Raspberry Pi
-constexpr uint32_t TRIP_TIMEOUT_MS     = 10000;
+constexpr uint32_t TRIP_TIMEOUT_MS     = 5000;    // 5 second timeout as requested
 constexpr uint32_t DEBOUNCE_US         = 4000;   // 4 ms debounce
 constexpr bool     RELAY_OFF_AFTER_TRIP = true;  // turn relay off after sensor trips
-constexpr uint32_t RELAY_ON_DURATION_MS = 1000;  // relay auto-off after 1 s
+constexpr uint32_t RELAY_ON_DURATION_MS = 1000;  // relay auto-off after 1 s (configurable)
+
+// Runtime settings (can be changed via serial commands)
+uint32_t g_relayOnDurationMs = RELAY_ON_DURATION_MS;
+bool g_timingLightsEnabled = true;  // true = wait for sensor, false = relay only
 
 // =========================
 // Helpers: time and logging
@@ -73,6 +77,7 @@ volatile uint64_t g_lastIsrChangeUs = 0;       // last time a logical edge was p
 enum class RunState : uint8_t {
   IDLE,
   WAIT_TRIP,
+  RELAY_ONLY,
   DONE
 };
 
@@ -176,20 +181,22 @@ void disarmSensor() {
 // =========================
 
 void startRun() {
-  // Arm sensor first
-  armSensor();
-
-  // Activate relay and start high-precision timer
+  // Activate relay and start timer
   setRelay(true);
   const uint64_t tNow = nowUs();
-  // Enable ISR to accept trip only after relay is ON
-  g_acceptTrip = true;
   g_tRelayOnUs = tNow;
-  g_relayOffAtMs = nowMs() + RELAY_ON_DURATION_MS;
+  g_relayOffAtMs = nowMs() + g_relayOnDurationMs;
 
-  // Transition state machine
-  g_state = RunState::WAIT_TRIP;
-  g_deadlineMs = nowMs() + TRIP_TIMEOUT_MS;
+  if (g_timingLightsEnabled) {
+    // Arm sensor and wait for trip
+    armSensor();
+    g_acceptTrip = true;
+    g_state = RunState::WAIT_TRIP;
+    g_deadlineMs = nowMs() + TRIP_TIMEOUT_MS;
+  } else {
+    // Relay only mode - just wait for duration
+    g_state = RunState::RELAY_ONLY;
+  }
 }
 
 void finishRunSuccess(uint64_t tRelayOnUs, uint64_t tTripUs) {
@@ -232,6 +239,15 @@ void finishRunTimeout() {
   disarmSensor();
   setRelay(false);
   Serial1.println("[WARN] TIMEOUT waiting for sensor");
+  g_state = RunState::DONE;
+}
+
+void finishRelayOnly() {
+  // Relay-only mode completed
+  setRelay(false);
+  Serial1.println("[INFO] Relay-only mode completed");
+  // Send completion message to Python app (no timing result)
+  Serial1.println("[COMPLETE] RELAY_ONLY");
   g_state = RunState::DONE;
 }
 
@@ -300,7 +316,45 @@ static inline void processSerialCommandIfAny() {
       if (g_state == RunState::IDLE && (cmd.length() == 0 || cmd == "GO")) {
         startRun();
       }
-      // Ignore other commands for now (keep output minimal)
+      // STOP command - reset to idle from any state
+      else if (cmd == "STOP") {
+        if (g_state != RunState::IDLE) {
+          disarmSensor();
+          setRelay(false);
+          g_state = RunState::IDLE;
+          Serial1.println("[INFO] Stopped by command");
+        }
+      }
+      // SET_DURATION command - set relay duration in milliseconds
+      else if (cmd.startsWith("SET_DURATION:")) {
+        String durationStr = cmd.substring(13);
+        uint32_t duration = durationStr.toInt();
+        if (duration >= 100 && duration <= 10000) {  // 100ms to 10s range
+          g_relayOnDurationMs = duration;
+          Serial1.printf("[SETTING] Relay duration set to %lu ms\n", (unsigned long)duration);
+        } else {
+          Serial1.println("[ERROR] Invalid duration (100-10000 ms)");
+        }
+      }
+      // SET_LIGHTS command - enable/disable timing lights
+      else if (cmd.startsWith("SET_LIGHTS:")) {
+        String lightsStr = cmd.substring(11);
+        if (lightsStr == "ON" || lightsStr == "1") {
+          g_timingLightsEnabled = true;
+          Serial1.println("[SETTING] Timing lights enabled");
+        } else if (lightsStr == "OFF" || lightsStr == "0") {
+          g_timingLightsEnabled = false;
+          Serial1.println("[SETTING] Timing lights disabled (relay only)");
+        } else {
+          Serial1.println("[ERROR] Invalid lights setting (ON/OFF or 1/0)");
+        }
+      }
+      // GET_SETTINGS command - return current settings
+      else if (cmd == "GET_SETTINGS") {
+        Serial1.printf("[SETTINGS] Duration=%lu ms, Lights=%s\n", 
+                      (unsigned long)g_relayOnDurationMs,
+                      g_timingLightsEnabled ? "ON" : "OFF");
+      }
     } else {
       if (g_lineBuf.length() < 64) {
         g_lineBuf += c;
@@ -360,6 +414,14 @@ void loop() {
       // Timeout check
       if ((int32_t)(nowMs() - g_deadlineMs) >= 0) {
         finishRunTimeout();
+      }
+      break;
+    }
+
+    case RunState::RELAY_ONLY: {
+      // Relay-only mode - just wait for duration
+      if ((int32_t)(nowMs() - g_relayOffAtMs) >= 0) {
+        finishRelayOnly();
       }
       break;
     }

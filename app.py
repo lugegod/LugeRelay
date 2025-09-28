@@ -154,6 +154,60 @@ class ESP32SerialManager:
             print(f"Failed to send GO: {e}")
             return False
 
+    def send_stop(self):
+        if not self.ser:
+            print("ESP32 serial not open; cannot send STOP")
+            return False
+        try:
+            self.ser.write(b"STOP\n")
+            self.ser.flush()
+            print("Sent STOP to ESP32")
+            return True
+        except Exception as e:
+            print(f"Failed to send STOP: {e}")
+            return False
+
+    def send_set_duration(self, duration_ms):
+        if not self.ser:
+            print("ESP32 serial not open; cannot send SET_DURATION")
+            return False
+        try:
+            cmd = f"SET_DURATION:{duration_ms}\n".encode()
+            self.ser.write(cmd)
+            self.ser.flush()
+            print(f"Sent SET_DURATION:{duration_ms} to ESP32")
+            return True
+        except Exception as e:
+            print(f"Failed to send SET_DURATION: {e}")
+            return False
+
+    def send_set_lights(self, enabled):
+        if not self.ser:
+            print("ESP32 serial not open; cannot send SET_LIGHTS")
+            return False
+        try:
+            cmd = f"SET_LIGHTS:{'ON' if enabled else 'OFF'}\n".encode()
+            self.ser.write(cmd)
+            self.ser.flush()
+            print(f"Sent SET_LIGHTS:{'ON' if enabled else 'OFF'} to ESP32")
+            return True
+        except Exception as e:
+            print(f"Failed to send SET_LIGHTS: {e}")
+            return False
+
+    def send_get_settings(self):
+        if not self.ser:
+            print("ESP32 serial not open; cannot send GET_SETTINGS")
+            return False
+        try:
+            self.ser.write(b"GET_SETTINGS\n")
+            self.ser.flush()
+            print("Sent GET_SETTINGS to ESP32")
+            return True
+        except Exception as e:
+            print(f"Failed to send GET_SETTINGS: {e}")
+            return False
+
     def _reader_loop(self):
         global last_result_msm, last_result_received_at
         buffer = b""
@@ -183,6 +237,19 @@ class ESP32SerialManager:
                         last_result_msm = result
                         last_result_received_at = time.time()
                         print(f"Received result from ESP32: {result}")
+                
+                # Parse completion message for relay-only mode
+                elif line.startswith('[COMPLETE] RELAY_ONLY'):
+                    # Relay-only mode completed - no timing result
+                    last_result_msm = None
+                    last_result_received_at = time.time()
+                    print("ESP32 relay-only mode completed")
+                    # Stop the sequence since ESP32 has completed
+                    global sequence_running, current_sequence, sequence_start_time, sequence_stopped
+                    sequence_running = False
+                    current_sequence = None
+                    sequence_start_time = None
+                    sequence_stopped = False  # Don't mark as stopped, just completed
             except Exception:
                 # Keep reader alive
                 time.sleep(0.05)
@@ -635,7 +702,7 @@ def index():
 @app.route('/start_sequence', methods=['POST'])
 def start_sequence():
     """Start a new timing sequence"""
-    global sequence_running, sequence_stopped
+    global sequence_running, sequence_stopped, last_result_msm, last_result_received_at
     
     if sequence_running:
         return jsonify({'success': False, 'message': 'Sequence already running'})
@@ -643,6 +710,12 @@ def start_sequence():
     try:
         # Reset stop flag before starting new sequence
         sequence_stopped = False
+        
+        # Clear any previous timing result when starting new sequence
+        last_result_msm = None
+        last_result_received_at = None
+        if esp32_serial:
+            esp32_serial.clear_result()
         
         data = request.get_json()
         delay1 = float(data.get('delay1', app.config['DEFAULT_DELAY1']))
@@ -712,7 +785,7 @@ def set_random_values():
 @app.route('/start_test_sequence', methods=['POST'])
 def start_test_sequence():
     """Start a test timing sequence (3s silence + final beep + relay)"""
-    global sequence_running, sequence_stopped
+    global sequence_running, sequence_stopped, last_result_msm, last_result_received_at
     
     if sequence_running:
         return jsonify({'success': False, 'message': 'Sequence already running'})
@@ -720,6 +793,12 @@ def start_test_sequence():
     try:
         # Reset stop flag before starting new test sequence
         sequence_stopped = False
+        
+        # Clear any previous timing result when starting new test sequence
+        last_result_msm = None
+        last_result_received_at = None
+        if esp32_serial:
+            esp32_serial.clear_result()
         
         data = request.get_json()
         offset = float(data.get('offset', 0.0))
@@ -748,6 +827,10 @@ def stop_sequence():
     try:
         # Set stop flag to interrupt the sequence
         sequence_stopped = True
+        
+        # Send STOP command to ESP32 if using ESP32
+        if app.config.get('USE_ESP32', False) and esp32_serial:
+            esp32_serial.send_stop()
         
         # Deactivate relay immediately when stopping
         set_relay_state(False)
@@ -840,8 +923,8 @@ def sequence_status():
         'relay_active': get_relay_status(),
         'esp32_connected': get_esp32_connected(),
         'using_esp32': bool(app.config.get('USE_ESP32', False)),
-        'final_time_msm': last_result_msm,
-        'final_time_sm': to_seconds_millis(last_result_msm)
+        'final_time_msm': None,  # Don't show result while sequence is running
+        'final_time_sm': None   # Don't show result while sequence is running
     })
 
 @app.route('/audio/<filename>')
@@ -940,6 +1023,12 @@ def save_settings():
         app.config['GATE_OPEN_DURATION'] = float(data.get('gate_open_duration', app.config['GATE_OPEN_DURATION']))
         app.config['BEEP_RELAY_ALIGNMENT'] = float(data.get('beep_relay_alignment', app.config['BEEP_RELAY_ALIGNMENT']))
         
+        # Sync gate duration with ESP32 if ESP32 is available
+        if app.config.get('USE_ESP32', False) and esp32_serial:
+            gate_duration_ms = int(app.config['GATE_OPEN_DURATION'] * 1000)  # Convert seconds to milliseconds
+            if esp32_serial.send_set_duration(gate_duration_ms):
+                app.config['ESP32_GATE_DURATION_MS'] = gate_duration_ms
+        
         # Update pygame volume if audio is initialized
         if pygame.mixer.get_init():
             pygame.mixer.music.set_volume(app.config['AUDIO_VOLUME'])
@@ -973,6 +1062,63 @@ def reinit_audio():
             return jsonify({'success': False, 'message': 'Failed to reinitialize audio system'})
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error reinitializing audio: {str(e)}'})
+
+@app.route('/esp32_set_duration', methods=['POST'])
+def esp32_set_duration():
+    """Set ESP32 gate duration"""
+    try:
+        data = request.get_json()
+        duration_ms = int(data.get('duration_ms', 1000))
+        
+        if duration_ms < 100 or duration_ms > 10000:
+            return jsonify({'success': False, 'message': 'Duration must be between 100-10000 ms'})
+        
+        if app.config.get('USE_ESP32', False) and esp32_serial:
+            if esp32_serial.send_set_duration(duration_ms):
+                app.config['ESP32_GATE_DURATION_MS'] = duration_ms
+                # Sync with timing settings gate duration (convert ms to seconds)
+                app.config['GATE_OPEN_DURATION'] = duration_ms / 1000.0
+                return jsonify({'success': True, 'message': f'ESP32 gate duration set to {duration_ms} ms'})
+            else:
+                return jsonify({'success': False, 'message': 'Failed to send command to ESP32'})
+        else:
+            return jsonify({'success': False, 'message': 'ESP32 not available'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'})
+
+@app.route('/esp32_set_lights', methods=['POST'])
+def esp32_set_lights():
+    """Set ESP32 timing lights on/off"""
+    try:
+        data = request.get_json()
+        enabled = bool(data.get('enabled', True))
+        
+        if app.config.get('USE_ESP32', False) and esp32_serial:
+            if esp32_serial.send_set_lights(enabled):
+                app.config['ESP32_TIMING_LIGHTS_ENABLED'] = enabled
+                return jsonify({'success': True, 'message': f'ESP32 timing lights {"enabled" if enabled else "disabled"}'})
+            else:
+                return jsonify({'success': False, 'message': 'Failed to send command to ESP32'})
+        else:
+            return jsonify({'success': False, 'message': 'ESP32 not available'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'})
+
+@app.route('/esp32_get_settings', methods=['GET'])
+def esp32_get_settings():
+    """Get ESP32 settings"""
+    try:
+        if app.config.get('USE_ESP32', False) and esp32_serial:
+            esp32_serial.send_get_settings()
+            return jsonify({
+                'success': True, 
+                'duration_ms': app.config.get('ESP32_GATE_DURATION_MS', 1000),
+                'lights_enabled': app.config.get('ESP32_TIMING_LIGHTS_ENABLED', True)
+            })
+        else:
+            return jsonify({'success': False, 'message': 'ESP32 not available'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'})
 
 if __name__ == '__main__':
     # Initialize audio system

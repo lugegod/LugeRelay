@@ -214,6 +214,11 @@
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="esp32-tab" data-bs-toggle="tab" data-bs-target="#esp32-settings" type="button" role="tab">
+                                ESP32 Settings
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
                             <button class="nav-link" id="server-tab" data-bs-toggle="tab" data-bs-target="#server" type="button" role="tab">
                                 Server Settings
                             </button>
@@ -299,6 +304,41 @@
                                     <input type="range" class="form-range" id="beepRelayAlignment" 
                                            min="-2" max="2" step="0.1" value="0.0">
                                     <div class="form-text">Adjust timing to align final beep with relay signal (negative = beep early, positive = beep late)</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- ESP32 Settings Tab -->
+                        <div class="tab-pane fade" id="esp32-settings" role="tabpanel">
+                            <div class="settings-section">
+                                <h3 class="mb-4">ESP32 Hardware Settings</h3>
+                                
+                                <div class="mb-4">
+                                    <label for="esp32GateDuration" class="form-label fw-bold">
+                                        Gate Duration: <span id="esp32GateDurationValue" class="setting-value">1000ms</span>
+                                    </label>
+                                    <input type="range" class="form-range" id="esp32GateDuration" 
+                                           min="100" max="10000" step="100" value="1000">
+                                    <div class="form-text">How long the ESP32 keeps the relay active (100-10000 ms)</div>
+                                </div>
+                                
+                                <div class="mb-4">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="esp32TimingLights" checked>
+                                        <label class="form-check-label fw-bold" for="esp32TimingLights">
+                                            Enable Timing Lights
+                                        </label>
+                                    </div>
+                                    <div class="form-text">When enabled, waits for sensor trip. When disabled, relay-only mode.</div>
+                                </div>
+                                
+                                <div class="d-grid gap-2">
+                                    <button type="button" class="btn btn-primary" onclick="updateEsp32Settings()">
+                                        Update ESP32 Settings
+                                    </button>
+                                    <button type="button" class="btn btn-secondary" onclick="getEsp32Settings()">
+                                        Get Current ESP32 Settings
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -492,6 +532,17 @@
             rangeInputs.forEach(input => {
                 input.addEventListener('input', function() {
                     updateDisplayValue(this);
+                    
+                    // Sync gate duration sliders
+                    if (this.id === 'gateOpenDuration') {
+                        const gateDurationMs = Math.round(parseFloat(this.value) * 1000);
+                        const esp32Slider = document.getElementById('esp32GateDuration');
+                        const esp32Value = document.getElementById('esp32GateDurationValue');
+                        if (esp32Slider && esp32Value) {
+                            esp32Slider.value = gateDurationMs;
+                            esp32Value.textContent = gateDurationMs + 'ms';
+                        }
+                    }
                 });
             });
             
@@ -559,6 +610,10 @@
             .then(data => {
                 if (data.success) {
                     showMessage('Settings saved successfully!', 'success');
+                    // Sync ESP32 gate duration with timing settings gate duration
+                    const gateDurationMs = Math.round(parseFloat(document.getElementById('gateOpenDuration').value) * 1000);
+                    document.getElementById('esp32GateDuration').value = gateDurationMs;
+                    document.getElementById('esp32GateDurationValue').textContent = gateDurationMs + 'ms';
                 } else {
                     showMessage('Error saving settings: ' + data.message, 'danger');
                 }
@@ -604,6 +659,93 @@
                 statusDiv.style.display = 'none';
             }, 5000);
         }
+        
+        // ESP32 Settings Functions
+        function updateEsp32Settings() {
+            const duration = parseInt(document.getElementById('esp32GateDuration').value);
+            const lightsEnabled = document.getElementById('esp32TimingLights').checked;
+            
+            // Update duration setting
+            fetch('/esp32_set_duration', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ duration_ms: duration })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showStatusMessage(data.message, 'success');
+                    // Sync the timing settings gate duration with ESP32 duration
+                    const timingGateDuration = duration / 1000.0; // Convert ms to seconds
+                    document.getElementById('gateOpenDuration').value = timingGateDuration;
+                    document.getElementById('gateOpenDurationValue').textContent = timingGateDuration.toFixed(1) + 's';
+                } else {
+                    showStatusMessage(data.message, 'danger');
+                }
+            })
+            .catch(error => {
+                showStatusMessage('Failed to update ESP32 duration', 'danger');
+            });
+            
+            // Update lights setting
+            fetch('/esp32_set_lights', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ enabled: lightsEnabled })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showStatusMessage(data.message, 'success');
+                } else {
+                    showStatusMessage(data.message, 'danger');
+                }
+            })
+            .catch(error => {
+                showStatusMessage('Failed to update ESP32 lights setting', 'danger');
+            });
+        }
+        
+        function getEsp32Settings() {
+            fetch('/esp32_get_settings')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('esp32GateDuration').value = data.duration_ms;
+                        document.getElementById('esp32GateDurationValue').textContent = data.duration_ms + 'ms';
+                        document.getElementById('esp32TimingLights').checked = data.lights_enabled;
+                        showStatusMessage('ESP32 settings retrieved successfully', 'success');
+                    } else {
+                        showStatusMessage(data.message, 'danger');
+                    }
+                })
+                .catch(error => {
+                    showStatusMessage('Failed to get ESP32 settings', 'danger');
+                });
+        }
+        
+        // ESP32 slider event listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            const esp32DurationSlider = document.getElementById('esp32GateDuration');
+            if (esp32DurationSlider) {
+                esp32DurationSlider.addEventListener('input', function() {
+                    document.getElementById('esp32GateDurationValue').textContent = this.value + 'ms';
+                    
+                    // Sync timing settings gate duration
+                    const timingGateDuration = parseFloat(this.value) / 1000.0;
+                    const timingSlider = document.getElementById('gateOpenDuration');
+                    const timingValue = document.getElementById('gateOpenDurationValue');
+                    if (timingSlider && timingValue) {
+                        timingSlider.value = timingGateDuration;
+                        timingValue.textContent = timingGateDuration.toFixed(1) + 's';
+                    }
+                });
+            }
+        });
     </script>
 </body>
 </html>
