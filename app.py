@@ -368,6 +368,8 @@ def get_esp32_connected():
         if esp32_serial and getattr(esp32_serial, 'ser', None):
             return bool(esp32_serial.ser.is_open)
         return False
+    except Exception:
+        return False
 
 def to_seconds_millis(result_msm: Optional[str]) -> Optional[str]:
     """Convert M:SS:MMM to SS.MMM (seconds.milliseconds) with seconds zero-padded to 2 digits."""
