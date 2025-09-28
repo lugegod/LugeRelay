@@ -25,7 +25,12 @@
 // Pin mapping (Arduino pin names)
 constexpr int PIN_RELAY   = D1;   // default; change as needed per XIAO ESP32S3 pinout
 constexpr int PIN_SENSOR  = D2;   // default; input from DFR0911 OUT
-constexpr int PIN_LED     = LED_BUILTIN;  // Built-in LED for status indication
+// LED functionality removed for simplicity
+
+// UART pin definitions for XIAO ESP32S3 (GPIO serial communication)
+#define RX_PIN D7
+#define TX_PIN D6
+#define BAUD 115200
 
 // Polarity configuration
 constexpr bool RELAY_ACTIVE_HIGH = true;  // set false for active-LOW relay boards
@@ -46,38 +51,7 @@ constexpr uint32_t RELAY_ON_DURATION_MS = 1000;  // relay auto-off after 1 s
 static inline uint32_t nowMs() { return millis(); }
 static inline uint64_t nowUs() { return micros(); }
 
-// =========================
-// LED Status Control
-// =========================
 
-void updateLedStatus() {
-  const uint32_t now = nowMs();
-  
-  if (g_serialConnected) {
-    // Serial connected - LED solid ON
-    digitalWrite(PIN_LED, HIGH);
-    g_ledState = true;
-  } else {
-    // Serial not connected - LED blinking (500ms on, 500ms off)
-    if ((int32_t)(now - g_nextLedBlinkMs) >= 0) {
-      g_ledState = !g_ledState;
-      digitalWrite(PIN_LED, g_ledState ? HIGH : LOW);
-      g_nextLedBlinkMs = now + 500;  // 500ms blink interval
-    }
-  }
-}
-
-void checkSerialConnection() {
-  // Simple serial connection detection - if Serial is available, we're connected
-  static uint32_t lastCheckMs = 0;
-  const uint32_t now = nowMs();
-  
-  // Check every 100ms
-  if ((int32_t)(now - lastCheckMs) >= 100) {
-    g_serialConnected = Serial;  // Serial object evaluates to true when connected
-    lastCheckMs = now;
-  }
-}
 
 // =========================
 // ISR-shared state (volatile)
@@ -116,11 +90,6 @@ uint32_t g_relayOffAtMs = 0;                   // scheduled time to turn relay O
 bool     g_autoStarted = false;                // auto-start only once after boot
 uint32_t g_bootMs = 0;                         // time at boot
 uint32_t g_nextHeartbeatMs = 0;                // 1 Hz heartbeat when idle
-
-// LED status indication
-bool     g_serialConnected = false;            // serial connection status
-uint32_t g_nextLedBlinkMs = 0;                 // LED blink timing
-bool     g_ledState = false;                   // current LED state
 
 // Serial input buffer (simple line buffer)
 String g_lineBuf;
@@ -182,7 +151,7 @@ void setRelay(bool on) {
 
   // Log only the activation event as specified
   if (on) {
-    Serial.printf("[EVENT] RELAY_ON t_ms=%lu\n", (unsigned long)nowMs());
+    Serial1.printf("[EVENT] RELAY_ON t_ms=%lu\n", (unsigned long)nowMs());
   }
 }
 
@@ -195,7 +164,7 @@ void armSensor() {
   g_tripCaptured = false;
   g_acceptTrip = false; // will be enabled when relay turns ON
   attachInterrupt(digitalPinToInterrupt(PIN_SENSOR), onSensorChange, CHANGE);
-  Serial.println("[INFO] Armed sensor");
+  Serial1.println("[INFO] Armed sensor");
 }
 
 void disarmSensor() {
@@ -233,25 +202,25 @@ void finishRunSuccess(uint64_t tRelayOnUs, uint64_t tTripUs) {
   }
 
   // Log sensor event and elapsed time
-  Serial.printf("[EVENT] SENSOR_TRIPPED t_ms=%lu\n", (unsigned long)nowMs());
+  Serial1.printf("[EVENT] SENSOR_TRIPPED t_ms=%lu\n", (unsigned long)nowMs());
 
   const uint64_t elapsedUs = (tTripUs - tRelayOnUs);
   const double elapsedSec = (double)elapsedUs / 1000000.0;
-  Serial.printf("[RESULT] ELAPSED_s=%.2f\n", elapsedSec);
+  Serial1.printf("[RESULT] ELAPSED_s=%.2f\n", elapsedSec);
 
   // Also print M:SS:MMM (Minutes:Seconds:Milliseconds)
   const uint32_t totalMs = (uint32_t)((elapsedUs + 500ULL) / 1000ULL); // rounded to nearest ms
   const uint32_t minutes = totalMs / 60000U;
   const uint32_t seconds = (totalMs % 60000U) / 1000U;
   const uint32_t millisPart = totalMs % 1000U;
-  Serial.printf("[RESULT] ELAPSED_MSM=%lu:%02lu:%03lu\n",
+  Serial1.printf("[RESULT] ELAPSED_MSM=%lu:%02lu:%03lu\n",
                 (unsigned long)minutes,
                 (unsigned long)seconds,
                 (unsigned long)millisPart);
 
   // Print compact SS.MMM for Pi (same info, different format)
   const uint32_t totalSeconds = (minutes * 60U) + seconds;
-  Serial.printf("[RESULT] ELAPSED_SM=%02lu.%03lu\n",
+  Serial1.printf("[RESULT] ELAPSED_SM=%02lu.%03lu\n",
                 (unsigned long)totalSeconds,
                 (unsigned long)millisPart);
 
@@ -262,18 +231,13 @@ void finishRunTimeout() {
   // Timeout reached while waiting for sensor
   disarmSensor();
   setRelay(false);
-  Serial.println("[WARN] TIMEOUT waiting for sensor");
+  Serial1.println("[WARN] TIMEOUT waiting for sensor");
   g_state = RunState::DONE;
 }
 
 void transitionToIdleAndAnnounce() {
   g_state = RunState::IDLE;
-  Serial.println("[INFO] Ready (type GO to run)");
-  if (g_serialConnected) {
-    Serial.println("[LED] Status: Serial connected - LED solid ON");
-  } else {
-    Serial.println("[LED] Status: Serial disconnected - LED blinking");
-  }
+  Serial1.println("[INFO] Ready (type GO to run)");
   // Schedule heartbeat immediately
   g_nextHeartbeatMs = nowMs();
 }
@@ -283,6 +247,10 @@ void transitionToIdleAndAnnounce() {
 // =========================
 
 void setup() {
+  // Initialize Serial1 with explicit UART pins for GPIO communication
+  Serial1.begin(BAUD, SERIAL_8N1, RX_PIN, TX_PIN);
+  
+  // Also initialize Serial for USB debugging (optional)
   Serial.begin(115200);
   // Give USB CDC a moment (non-blocking pattern)
   unsigned long startWait = millis();
@@ -290,19 +258,14 @@ void setup() {
     // brief wait for Serial to open; not required
   }
 
-  // LED setup for status indication
-  pinMode(PIN_LED, OUTPUT);
-  digitalWrite(PIN_LED, LOW);  // Start with LED off
-  g_nextLedBlinkMs = nowMs();  // Initialize blink timing
-
   // Relay output setup
   pinMode(PIN_RELAY, OUTPUT);
   setRelay(false); // ensure relay starts OFF
 
   // Boot banner
-  Serial.printf(
-    "[BOOT] LugeRelay Test | RelayPin=%d ActiveHigh=%d | SensorPin=%d ActiveLow=%d | LED=%d\n",
-    PIN_RELAY, RELAY_ACTIVE_HIGH ? 1 : 0, PIN_SENSOR, SENSOR_ACTIVE_LOW ? 1 : 0, PIN_LED
+  Serial1.printf(
+    "[BOOT] LugeRelay Test | RelayPin=%d ActiveHigh=%d | SensorPin=%d ActiveLow=%d | UART RX=%d TX=%d\n",
+    PIN_RELAY, RELAY_ACTIVE_HIGH ? 1 : 0, PIN_SENSOR, SENSOR_ACTIVE_LOW ? 1 : 0, RX_PIN, TX_PIN
   );
 
   g_bootMs = nowMs();
@@ -320,8 +283,8 @@ static inline bool shouldAutoStartNow() {
 }
 
 static inline void processSerialCommandIfAny() {
-  while (Serial.available() > 0) {
-    char c = (char)Serial.read();
+  while (Serial1.available() > 0) {
+    char c = (char)Serial1.read();
     if (c == '\r') {
       // ignore CR
       continue;
@@ -347,15 +310,11 @@ static inline void processSerialCommandIfAny() {
 }
 
 void loop() {
-  // Update LED status based on serial connection
-  checkSerialConnection();
-  updateLedStatus();
-  
   // Heartbeat when idle (1 Hz)
   if (g_state == RunState::IDLE) {
     const uint32_t now = nowMs();
     if ((int32_t)(now - g_nextHeartbeatMs) >= 0) {
-      Serial.printf("[STATUS] idle t_ms=%lu\n", (unsigned long)now);
+      Serial1.printf("[STATUS] idle t_ms=%lu\n", (unsigned long)now);
       g_nextHeartbeatMs = now + 1000;
     }
 
